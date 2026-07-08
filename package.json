@@ -1,0 +1,20 @@
+{
+  "name": "maarif-takvimi",
+  "version": "1.0.0",
+  "description": "Saatli Maarif Takvimi — e-ink (Kindle) dashboard: Google Calendar + Muğla Ortaköy hava durumu + günün sözü. Server-side SVG->PNG render.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "TZ=UTC node server.js",
+    "dev": "TZ=UTC node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "express": "^4.19.2",
+    "node-ical": "^0.20.1"
+  },
+  "license": "MIT"
+}

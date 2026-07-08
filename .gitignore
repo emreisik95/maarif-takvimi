@@ -1,0 +1,7 @@
+node_modules
+*.log
+.DS_Store
+/tmp
+*.local
+# gizli ICS adresi vb. — asla commit'leme
+.env
