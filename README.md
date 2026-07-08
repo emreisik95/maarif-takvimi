@@ -43,7 +43,7 @@ denenebilir.
 ## Hızlı başlangıç
 
 ```bash
-git clone https://github.com/emreisik/maarif-takvimi.git
+git clone https://github.com/emreisik95/maarif-takvimi.git
 cd maarif-takvimi
 npm install
 cp .env.example .env    # istediklerini aç/değiştir
