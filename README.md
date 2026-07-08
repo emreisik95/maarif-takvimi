@@ -9,6 +9,10 @@ altta günün sözü.
 > calendar ("Saatli Maarif Takvimi") — Google Calendar, weather, Hijri date and
 > a quote of the day, server-rendered to a single e-ink friendly PNG.*
 
+**Canlı demo:** https://maarif-demo.external.emre.zip — İstanbul/Kadıköy havası +
+örnek Dünya Kupası 2026 fikstürü ([data/demo-worldcup.ics](data/demo-worldcup.ics)),
+tamamen env değişkenleriyle yapılandırılmış.
+
 ![önizleme](docs/preview.png)
 
 ## Nasıl çalışır?
