@@ -11,7 +11,7 @@ import { num } from './src/env.js';
 
 const app = express();
 const PORT = num(process.env.PORT, 3000);
-const REFRESH = num(process.env.REFRESH_SECONDS, 300); // e-ink dostu: 5 dk (bozuk env'de bile geçerli sayı)
+const REFRESH = num(process.env.REFRESH_SECONDS, 10800); // e-ink dostu: 3 saat (bozuk env'de bile geçerli sayı)
 
 app.get('/health', (_req, res) => res.type('text').send('ok'));
 
@@ -47,14 +47,8 @@ app.get('/', (_req, res) => {
 <meta http-equiv="refresh" content="${REFRESH}">
 <title>Saatli Maarif Takvimi</title>
 <style>
-  /* Eski Kindle WebKit'i için basit tut: flex yok, sadece blok + max-width.
-     Telefonda device-width viewport ile görüntü ekrana sığar (zoom yok). */
-  html,body{margin:0;padding:0;background:#fff;text-align:center}
-  img{display:block;margin:0 auto;width:100%;max-width:600px;height:auto}
-  @media (min-aspect-ratio: 3/4) {
-    /* Yatay/geniş ekran: yüksekliğe sığdır */
-    img{width:auto;max-width:100%;max-height:100vh}
-  }
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#fff}
+  img{display:block;width:100vw;height:100vh;object-fit:contain}
 </style>
 </head>
 <body>

@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "TZ=UTC node server.js",
-    "dev": "TZ=UTC node --watch server.js"
+    "dev": "TZ=UTC node --watch server.js",
+    "test": "TZ=UTC node --test"
   },
   "engines": {
     "node": ">=20"

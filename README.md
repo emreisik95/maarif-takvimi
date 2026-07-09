@@ -104,8 +104,10 @@ Env değişkenlerini CapRover panelinden (App Configs → Environment Variables)
 
 Hedef cihaz: eski e-ink Kindle (test: Kindle Touch 7. nesil, 600×800).
 
-**Kolay yol:** jailbreak sonrası deneysel tarayıcıyı sunucu adresine yönlendir;
-sayfa `REFRESH_SECONDS`'ta bir kendini yeniler.
+**Kolay yol:** deneysel tarayıcıyı sunucu adresine yönlendir; sayfa
+`REFRESH_SECONDS`'ta bir kendini yeniler. Varsayılan değer Kindle pili için
+3 saattir (`10800` saniye). Stok tarayıcı tam kiosk/fullscreen vermeyebilir;
+sayfa buna rağmen tek PNG'yi taşmadan viewport'a sığdırır.
 
 **Sağlam yol:** jailbreak + KUAL ile `/image.png`'i doğrudan ekrana bas:
 

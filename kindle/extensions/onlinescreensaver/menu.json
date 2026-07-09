@@ -1,0 +1,39 @@
+{
+	"items": [
+		{
+			"name": "Maarif Lock Screen",
+			"items": [
+				{
+					"name": "Update lock image now",
+					"priority": 0,
+					"action": "bin/update.sh"
+				},
+				{
+					"name": "Start 3h lock refresh",
+					"priority": 0,
+					"action": "bin/enable.sh"
+				},
+				{
+					"name": "Stop lock refresh",
+					"priority": 0,
+					"action": "bin/disable.sh"
+				},
+				{
+					"name": "Reset sleep blockers",
+					"priority": 0,
+					"action": "bin/reset-sleep.sh"
+				},
+				{
+					"name": "Write diagnostics log",
+					"priority": 0,
+					"action": "bin/diagnose.sh"
+				},
+				{
+					"name": "Sleep diagnostic (60s)",
+					"priority": 0,
+					"action": "bin/sleepdiag.sh"
+				}
+			]
+		}
+	]
+}
