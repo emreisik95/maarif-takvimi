@@ -66,7 +66,8 @@ test('upstart owns a reboot-persistent single foreground daemon', () => {
   assert.match(job, /exec \/bin\/sh \/mnt\/base-us\/extensions\/maarif\/bin\/daemon\.sh/);
   assert.match(daemon, /mkdir "\$LOCK_DIR"/);
   assert.match(daemon, /kill -0/);
-  assert.match(daemon, /trap .*cleanup/);
+  assert.match(daemon, /trap 'cleanup_daemon' 0/);
+  assert.match(daemon, /trap 'exit 0' HUP INT TERM/);
   assert.match(daemon, /userstore_available/);
   assert.doesNotMatch(daemon, /sleep 10800/);
 });
@@ -78,7 +79,8 @@ test('install and uninstall always restore the Kindle root filesystem read-only'
   for (const script of [install, uninstall]) {
     assert.match(script, /MNTROOT_BIN.*rw/);
     assert.match(script, /MNTROOT_BIN.*ro/);
-    assert.match(script, /trap .*remount_ro/);
+    assert.match(script, /trap 'remount_ro' 0/);
+    assert.match(script, /trap 'exit 1' HUP INT TERM/);
     assert.match(script, /\/etc\/upstart\/maarif\.conf/);
   }
   assert.match(install, /UPSTART_JOB.*\.tmp\.\$\$/);
@@ -102,6 +104,8 @@ test('refresh validates, normalizes and commits images transactionally', () => {
   assert.match(refresh, /TARGET_IMAGE.*\.tmp\.\$\$/);
   assert.match(refresh, /mv .*LAST_GOOD_IMAGE/);
   assert.match(refresh, /mv .*TARGET_IMAGE/);
+  assert.match(refresh, /trap 'cleanup_refresh' 0/);
+  assert.match(refresh, /trap 'exit 1' HUP INT TERM/);
   assert.match(library, /89504e470d0a1a0a/);
   assert.match(library, /standard_deviation/);
   assert.match(library, /600 800 8/);

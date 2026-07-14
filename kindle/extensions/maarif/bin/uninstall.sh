@@ -17,7 +17,8 @@ remount_ro() {
     ROOT_RW=0
   fi
 }
-trap 'remount_ro' 0 HUP INT TERM
+trap 'remount_ro' 0
+trap 'exit 1' HUP INT TERM
 
 /bin/sh "$SCRIPT_DIR/stop.sh" || true
 "$STOP_BIN" maarif >/dev/null 2>&1 || true
@@ -36,4 +37,3 @@ fi
 rm -f "$ENABLED_FILE"
 log_message "automatic start removed; extension files preserved"
 exit 0
-

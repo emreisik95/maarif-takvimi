@@ -22,7 +22,8 @@ remount_ro() {
     ROOT_RW=0
   fi
 }
-trap 'remount_ro' 0 HUP INT TERM
+trap 'remount_ro' 0
+trap 'exit 1' HUP INT TERM
 
 rollback_installed_job() {
   if "$MNTROOT_BIN" rw >/dev/null 2>&1; then

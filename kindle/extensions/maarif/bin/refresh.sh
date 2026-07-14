@@ -20,7 +20,8 @@ cleanup_refresh() {
     WIFI_WAS_OFF=0
   fi
 }
-trap 'cleanup_refresh' 0 HUP INT TERM
+trap 'cleanup_refresh' 0
+trap 'exit 1' HUP INT TERM
 
 requested_mode=${1:-auto}
 if [ "$requested_mode" = auto ]; then
@@ -93,7 +94,7 @@ cp "$NORMALIZED_TMP" "$TARGET_TMP" || exit 1
 "$SYNC_BIN" >/dev/null 2>&1 || true
 mv "$LAST_GOOD_TMP" "$LAST_GOOD_IMAGE" || exit 1
 mv "$TARGET_TMP" "$TARGET_IMAGE" || exit 1
+"$SYNC_BIN" >/dev/null 2>&1 || true
 log_message "fresh image committed to target and last-good"
 refresh_screen_if_asleep
 exit 0
-

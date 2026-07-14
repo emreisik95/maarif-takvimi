@@ -195,6 +195,49 @@ test('an early wake does not complete the wait and suspend gets the remaining RT
   assert.match(commands, /setprop:-i com\.lab126\.powerd rtcWakeup 90/);
 });
 
+test('a failed boundary wait is retried without refreshing early', () => {
+  const h = harness();
+  const enabled = `${h.base}/enabled`;
+  const waitFailures = `${h.root}/wait-failures`;
+  const sleepCount = `${h.root}/sleep-count`;
+  writeFileSync(enabled, '');
+
+  executable(`${h.commands}/date-retry`, `
+if [ "$1" = "+%s" ]; then
+  count=$(cat "$STUB_WAIT_FAILURES" 2>/dev/null || printf '0')
+  printf '%s\\n' "$((count + 1))" > "$STUB_WAIT_FAILURES"
+  case "$count" in
+    0) printf '100\\n' ;;
+    1) exit 1 ;;
+    2) printf '200\\n' ;;
+    *) exit 1 ;;
+  esac
+else
+  printf '2026-07-14 10:00:00\\n'
+fi
+  `.trim());
+  executable(`${h.commands}/sleep-retry`, `
+count=$(cat "$STUB_SLEEP_COUNT" 2>/dev/null || printf '0')
+echo "sleep:$*" >> "$STUB_COMMAND_LOG"
+printf '%s\\n' "$((count + 1))" > "$STUB_SLEEP_COUNT"
+[ "$count" -ge 1 ] && rm -f "$STUB_ENABLED_FILE"
+  `.trim());
+
+  const result = run('daemon.sh', [], {
+    ...h.env,
+    MAARIF_NOW: '10:00:00',
+    MAARIF_LOCK_DIR: `${h.root}/lock`,
+    DATE_BIN: `${h.commands}/date-retry`,
+    SLEEP_BIN: `${h.commands}/sleep-retry`,
+    STUB_WAIT_FAILURES: waitFailures,
+    STUB_SLEEP_COUNT: sleepCount,
+    STUB_ENABLED_FILE: enabled,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const curlCalls = readFileSync(h.commandLog, 'utf8').match(/^curl$/gm) ?? [];
+  assert.equal(curlCalls.length, 1, 'refresh must not run again before a real boundary');
+});
+
 test('userstore availability prevents writes while USB mass storage owns the volume', () => {
   const h = harness();
   assert.equal(output('schedule.sh', ['userstore'], { ...h.env, STUB_USERSTORE: '1' }), 'available');
@@ -225,7 +268,9 @@ test('a successful normal refresh commits the normalized image to target and las
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(readFileSync(h.target), readFileSync(h.normalized));
   assert.deepEqual(readFileSync(h.lastGood), readFileSync(h.normalized));
-  assert.match(readFileSync(h.commandLog, 'utf8'), /curl[\s\S]*convert[\s\S]*sync/);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /curl[\s\S]*convert[\s\S]*sync/);
+  assert.ok((commands.match(/^sync$/gm) ?? []).length >= 2, 'rename metadata must also be synced');
 });
 
 test('a failed download leaves an existing valid target untouched', () => {

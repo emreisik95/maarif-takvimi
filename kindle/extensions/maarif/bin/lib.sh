@@ -129,6 +129,7 @@ install_display_image() {
   cp "$SOURCE_IMAGE" "$TARGET_TMP" || return 1
   "$SYNC_BIN" >/dev/null 2>&1 || true
   mv "$TARGET_TMP" "$TARGET_IMAGE" || return 1
+  "$SYNC_BIN" >/dev/null 2>&1 || true
   log_message "$DESCRIPTION installed"
   refresh_screen_if_asleep
 }
@@ -141,7 +142,8 @@ seed_last_good_from() {
   rm -f "$LAST_TMP"
   cp "$SOURCE_IMAGE" "$LAST_TMP" || return 1
   "$SYNC_BIN" >/dev/null 2>&1 || true
-  mv "$LAST_TMP" "$LAST_GOOD_IMAGE"
+  mv "$LAST_TMP" "$LAST_GOOD_IMAGE" || return 1
+  "$SYNC_BIN" >/dev/null 2>&1 || true
 }
 
 ensure_verified_last_good() {
