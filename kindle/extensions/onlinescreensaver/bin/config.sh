@@ -36,6 +36,7 @@ SCHEDULE="00:00-03:00=60 03:00-04:00=60 04:00-24:00=180"
 #IMAGE_URI="http://enter.the.domain/here/and/the/path/to/the/image.png"
 IMAGE_URI="https://maarif-takvimi.external.emre.zip/image.png"
 WHITE_IMAGE="/mnt/us/extensions/onlinescreensaver/bin/white.png"
+LAST_GOOD_IMAGE="/mnt/us/extensions/onlinescreensaver/bin/last-good.png"
 
 # folder that holds the screensavers
 SCREENSAVERFOLDER=/mnt/us/linkss/screensavers/
@@ -61,14 +62,12 @@ LOGFILE=/mnt/us/onlinescreensaver.log
 # when the script started, it will always turn it off)
 DISABLE_WIFI=0
 
-# Domain to ping to test network connectivity. Default should work, but in
-# case some firewall blocks access, try a popular local website.
-TEST_DOMAIN="www.google.com"
-
-# How long (in seconds) to wait for an internet connection to be established
-# (if you experience frequent timeouts when waking up from sleep, try to
-# increase this value)
-NETWORK_TIMEOUT=30
+# The image URL itself is the connectivity check. A sleeping Kindle can need
+# some time to reassociate with Wi-Fi, so retry a bounded number of times.
+DOWNLOAD_ATTEMPTS=3
+DOWNLOAD_RETRY_DELAY=10
+CURL_CONNECT_TIMEOUT=20
+CURL_MAX_TIME=90
 
 
 

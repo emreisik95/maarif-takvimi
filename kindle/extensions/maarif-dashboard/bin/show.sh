@@ -34,10 +34,15 @@ normalize_image() {
   # eips renkli (RGB/RGBA) PNG'yi satır baytlarını piksel sanarak yatayda gerer.
   # linkss'in convert'i varsa panele birebir 8-bit gri PNG'ye indir; yoksa
   # sunucunun zaten gri PNG verdiğine güven (src/raster.js grayscale üretir).
-  CONVERT=/mnt/us/linkss/bin/convert
+  CONVERT="${MAARIF_CONVERT:-/mnt/us/linkss/bin/convert}"
   [ -x "$CONVERT" ] || return 0
-  N="${OUT}.norm"
-  if "$CONVERT" "$OUT" -resize "${MAARIF_SCREEN_SIZE:-600x800}!" -background white -alpha remove -alpha off -colorspace Gray -type Grayscale -depth 8 "PNG8:$N"; then
+  N="${OUT}.norm.png"
+  SCREEN_SIZE="${MAARIF_SCREEN_SIZE:-600x800}"
+  if "$CONVERT" "$OUT" \
+    -resize "$SCREEN_SIZE" \
+    -background white -gravity center -extent "$SCREEN_SIZE" \
+    -alpha remove -alpha off -colorspace Gray -type Grayscale -depth 8 \
+    -define png:color-type=0 "$N"; then
     mv "$N" "$OUT"
     log "normalize ok"
   else
