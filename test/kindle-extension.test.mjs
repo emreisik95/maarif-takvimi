@@ -45,6 +45,12 @@ test('configuration targets the production landscape dashboard and Kindle panel'
   assert.match(config, /STATE_DIR=.*MAARIF_BASE\/state/);
   assert.match(config, /LAST_GOOD_IMAGE=.*STATE_DIR\/last-good\.png/);
   assert.match(config, /DOWNLOAD_ATTEMPTS=.*3/);
+
+  const white = readFileSync(`${root}/assets/white.png`);
+  const fallback = readFileSync(`${root}/assets/fallback.png`);
+  const initialLastGood = readFileSync(`${root}/state/last-good.png`);
+  assert.notDeepEqual(fallback, white, 'offline fallback must not be blank white');
+  assert.deepEqual(initialLastGood, fallback, 'initial last-good must be the verified fallback');
 });
 
 test('upstart owns a reboot-persistent single foreground daemon', () => {
