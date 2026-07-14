@@ -5,7 +5,12 @@
 // GET /health      -> sağlık kontrolü
 import express from 'express';
 import { assembleModel } from './src/model.js';
-import { buildLandscapeSVG, buildSVG, LANDSCAPE_VARIANTS } from './src/render.js';
+import {
+  buildLandscapeSVG,
+  buildSVG,
+  LANDSCAPE_VARIANTS,
+  selectLandscapeVariant,
+} from './src/render.js';
 import { svgToPng } from './src/raster.js';
 import { num } from './src/env.js';
 
@@ -40,14 +45,19 @@ app.get('/image.png', async (_req, res) => {
 // yatay kompozisyonları gösterir.
 app.get('/image-landscape/:variant.png', async (req, res) => {
   const { variant } = req.params;
-  if (!LANDSCAPE_VARIANTS.includes(variant)) {
+  if (variant !== 'auto' && !LANDSCAPE_VARIANTS.includes(variant)) {
     return res.status(404).type('text').send('unknown landscape layout');
   }
 
   try {
     const model = await assembleModel();
-    const png = svgToPng(buildLandscapeSVG(model, variant), 800);
-    return res.type('image/png').set('Cache-Control', 'no-store').send(png);
+    const selectedVariant = variant === 'auto' ? selectLandscapeVariant(model) : variant;
+    const png = svgToPng(buildLandscapeSVG(model, selectedVariant), 800);
+    return res
+      .type('image/png')
+      .set('Cache-Control', 'no-store')
+      .set('X-Maarif-Layout', selectedVariant)
+      .send(png);
   } catch (err) {
     console.error(err);
     return res.status(500).type('text').send('render error: ' + err.message);

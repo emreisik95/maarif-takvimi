@@ -333,6 +333,10 @@ export function buildSVG(model) {
 // Bunlar seçim önizlemesidir; buildSVG kullanan canlı portre endpoint değişmez.
 export const LANDSCAPE_VARIANTS = Object.freeze(['balanced', 'date-focus', 'agenda-focus']);
 
+export function selectLandscapeVariant(model) {
+  return (model.events || []).length > 0 ? 'agenda-focus' : 'date-focus';
+}
+
 function landscapeHeader(model) {
   const p = [];
   p.push(txt(122, 67, `Miladi ${model.effective.year}`, { size: 19, weight: 'bold' }));

@@ -11,12 +11,12 @@ test('Kindle lock screen automation updates the linkss screensaver image safely'
 
   assert.match(config, /DEFAULTINTERVAL=180/);
   assert.match(config, /SCHEDULE="00:00-03:00=60 03:00-04:00=60 04:00-24:00=180"/);
-  assert.match(config, /IMAGE_URI="https:\/\/maarif-takvimi\.external\.emre\.zip\/image\.png"/);
+  assert.match(config, /IMAGE_URI="https:\/\/maarif-takvimi\.external\.emre\.zip\/image-landscape\/auto\.png"/);
   assert.match(config, /WHITE_IMAGE="\/mnt\/us\/extensions\/onlinescreensaver\/bin\/white\.png"/);
   assert.match(config, /SCREENSAVERFILE=\/mnt\/us\/linkss\/screensavers\/bg_ss00\.png/);
   assert.match(config, /LAST_GOOD_IMAGE=/);
   assert.match(config, /DOWNLOAD_ATTEMPTS=3/);
-  assert.match(config, /IMAGE_ROTATION=0/);
+  assert.match(config, /IMAGE_ROTATION=90/);
 
   assert.match(updateScript, /HOUR=\$\(date '\+%H'\)/);
   assert.match(updateScript, /\[ "\$HOUR" = "03" \]/);

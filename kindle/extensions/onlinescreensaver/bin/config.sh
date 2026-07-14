@@ -34,7 +34,7 @@ SCHEDULE="00:00-03:00=60 03:00-04:00=60 04:00-24:00=180"
 # URL of screensaver image. This really must be in the EXACT resolution of
 # your Kindle's screen (e.g. 600x800 or 758x1024) and really must be PNG.
 #IMAGE_URI="http://enter.the.domain/here/and/the/path/to/the/image.png"
-IMAGE_URI="https://maarif-takvimi.external.emre.zip/image.png"
+IMAGE_URI="https://maarif-takvimi.external.emre.zip/image-landscape/auto.png"
 WHITE_IMAGE="/mnt/us/extensions/onlinescreensaver/bin/white.png"
 LAST_GOOD_IMAGE="/mnt/us/extensions/onlinescreensaver/bin/last-good.png"
 
@@ -53,7 +53,7 @@ SCREEN_SIZE=600x800
 # Clockwise ImageMagick rotation before fitting to the panel. Keep 0 for the
 # portrait endpoint; use 90 or -90 with an 800x600 landscape endpoint depending
 # on which side of the Kindle will face upward.
-IMAGE_ROTATION=0
+IMAGE_ROTATION=90
 
 # Whether to create log output (1) or not (0).
 LOGGING=1

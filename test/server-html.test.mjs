@@ -35,7 +35,7 @@ test('landscape preview endpoints return each 800x600 grayscale design without c
   const port = String(4200 + Math.floor(Math.random() * 1000));
   const server = spawn(process.execPath, ['server.js'], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: port },
+    env: { ...process.env, PORT: port, CALENDAR_ICS_URL: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -56,6 +56,13 @@ test('landscape preview endpoints return each 800x600 grayscale design without c
 
     const invalid = await fetch(`http://127.0.0.1:${port}/image-landscape/unknown.png`);
     assert.equal(invalid.status, 404);
+
+    const automatic = await fetch(`http://127.0.0.1:${port}/image-landscape/auto.png`);
+    const automaticPng = Buffer.from(await automatic.arrayBuffer());
+    assert.equal(automatic.status, 200);
+    assert.equal(automatic.headers.get('x-maarif-layout'), 'agenda-focus');
+    assert.equal(automaticPng.readUInt32BE(16), 800);
+    assert.equal(automaticPng.readUInt32BE(20), 600);
 
     const defaultImage = await fetch(`http://127.0.0.1:${port}/image.png`);
     const portrait = Buffer.from(await defaultImage.arrayBuffer());

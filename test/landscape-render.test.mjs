@@ -50,3 +50,20 @@ test('rasterizer can preserve the landscape canvas at 800x600 grayscale', () => 
   assert.equal(png[25], 0);
 });
 
+test('automatic landscape emphasizes the date only when the agenda is empty', () => {
+  assert.equal(typeof render.selectLandscapeVariant, 'function');
+
+  const emptyModel = { ...model, events: [] };
+  const populatedModel = { ...model, events: [{ time: '09:00', title: 'Toplantı' }] };
+
+  assert.equal(render.selectLandscapeVariant(emptyModel), 'date-focus');
+  assert.equal(render.selectLandscapeVariant(populatedModel), 'agenda-focus');
+  assert.match(
+    render.buildLandscapeSVG(emptyModel, render.selectLandscapeVariant(emptyModel)),
+    /data-layout="date-focus"/,
+  );
+  assert.match(
+    render.buildLandscapeSVG(populatedModel, render.selectLandscapeVariant(populatedModel)),
+    /data-layout="agenda-focus"/,
+  );
+});
