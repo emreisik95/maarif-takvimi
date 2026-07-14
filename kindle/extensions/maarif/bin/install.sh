@@ -45,6 +45,9 @@ stop_legacy_schedulers() {
       [ "$LEGACY_PID" = "$$" ] || kill "$LEGACY_PID" >/dev/null 2>&1 || true
     done
   done
+  rm -f /tmp/maarif-dashboard.pid
+  "$LIPC_SET_BIN" com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
+  "$LIPC_SET_BIN" com.lab126.powerd stopSuspend 0 >/dev/null 2>&1 || true
 }
 
 remove_legacy_upstart_jobs() {

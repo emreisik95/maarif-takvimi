@@ -351,6 +351,8 @@ test('install persists the upstart job, enables the daemon and restores root rea
   const commands = readFileSync(h.commandLog, 'utf8');
   assert.match(commands, /mntroot:rw[\s\S]*mntroot:ro/);
   assert.match(commands, /start:maarif/);
+  assert.match(commands, /setprop:com\.lab126\.powerd preventScreenSaver 0/);
+  assert.match(commands, /setprop:com\.lab126\.powerd stopSuspend 0/);
 });
 
 test('a failed upstart copy still restores root read-only and does not enable', () => {
