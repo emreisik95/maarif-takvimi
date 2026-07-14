@@ -31,6 +31,42 @@ test('root page shows only the calendar image in a Kindle-friendly viewport', as
   }
 });
 
+test('landscape preview endpoints return each 800x600 grayscale design without changing the default image', async () => {
+  const port = String(4200 + Math.floor(Math.random() * 1000));
+  const server = spawn(process.execPath, ['server.js'], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: port },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  try {
+    await waitForServer(server, port);
+
+    for (const variant of ['balanced', 'date-focus', 'agenda-focus']) {
+      const response = await fetch(`http://127.0.0.1:${port}/image-landscape/${variant}.png`);
+      const png = Buffer.from(await response.arrayBuffer());
+
+      assert.equal(response.status, 200, variant);
+      assert.match(response.headers.get('content-type') ?? '', /^image\/png/);
+      assert.equal(png.readUInt32BE(16), 800, variant);
+      assert.equal(png.readUInt32BE(20), 600, variant);
+      assert.equal(png[24], 8, variant);
+      assert.equal(png[25], 0, variant);
+    }
+
+    const invalid = await fetch(`http://127.0.0.1:${port}/image-landscape/unknown.png`);
+    assert.equal(invalid.status, 404);
+
+    const defaultImage = await fetch(`http://127.0.0.1:${port}/image.png`);
+    const portrait = Buffer.from(await defaultImage.arrayBuffer());
+    assert.equal(portrait.readUInt32BE(16), 600);
+    assert.equal(portrait.readUInt32BE(20), 800);
+  } finally {
+    server.kill('SIGTERM');
+    await once(server, 'exit').catch(() => {});
+  }
+});
+
 async function waitForServer(server, port) {
   const deadline = Date.now() + 5000;
   let lastError;
