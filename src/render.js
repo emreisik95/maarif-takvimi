@@ -507,9 +507,8 @@ export function buildLandscapeSVG(model, variant = 'balanced') {
     s.push(landscapeDateBox(model, 270, 145, 260, 330));
     s.push(landscapeWeatherBox(model, 545, 145, 225, 330));
   } else if (variant === 'date-focus') {
-    s.push(landscapeCalendarBox(model, 30, 145, 190, 330));
-    s.push(landscapeDateBox(model, 235, 145, 330, 330, true));
-    s.push(landscapeWeatherBox(model, 580, 145, 190, 330));
+    s.push(landscapeDateBox(model, 30, 145, 500, 330, true));
+    s.push(landscapeWeatherBox(model, 545, 145, 225, 330));
   } else {
     s.push(landscapeCalendarBox(model, 30, 145, 350, 330, 5));
     s.push(landscapeDateBox(model, 395, 145, 375, 215, true));

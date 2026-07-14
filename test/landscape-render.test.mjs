@@ -32,7 +32,11 @@ test('landscape renderer exposes three selectable 800x600 compositions', () => {
     assert.match(svg, />TEMMUZ</);
     assert.match(svg, />14</);
     assert.match(svg, />SALI</);
-    assert.match(svg, /Proje değerlendirme/);
+    if (variant === 'date-focus') {
+      assert.doesNotMatch(svg, /AJANDASI|Proje değerlendirme/);
+    } else {
+      assert.match(svg, /Proje değerlendirme/);
+    }
     assert.match(svg, />Açık</);
     assert.match(svg, />Vakit nakittir\.</);
     assert.match(svg, new RegExp(`data-layout="${variant}"`));
@@ -58,10 +62,11 @@ test('automatic landscape emphasizes the date only when the agenda is empty', ()
 
   assert.equal(render.selectLandscapeVariant(emptyModel), 'date-focus');
   assert.equal(render.selectLandscapeVariant(populatedModel), 'agenda-focus');
-  assert.match(
-    render.buildLandscapeSVG(emptyModel, render.selectLandscapeVariant(emptyModel)),
-    /data-layout="date-focus"/,
-  );
+  const emptySvg = render.buildLandscapeSVG(emptyModel, render.selectLandscapeVariant(emptyModel));
+  assert.match(emptySvg, /data-layout="date-focus"/);
+  assert.doesNotMatch(emptySvg, /AJANDASI|Etkinlik yok/);
+  assert.match(emptySvg, />TEMMUZ</);
+  assert.match(emptySvg, />Açık</);
   assert.match(
     render.buildLandscapeSVG(populatedModel, render.selectLandscapeVariant(populatedModel)),
     /data-layout="agenda-focus"/,
