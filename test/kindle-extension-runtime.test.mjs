@@ -125,6 +125,8 @@ printf '%s\\n' "$((count + 1))" > "$STUB_EVENT_COUNT"
       MAARIF_BASE: base,
       MAARIF_TARGET_IMAGE: target,
       MAARIF_LOG_FILE: log,
+      MAARIF_LEGACY_JOB_1: `${root}/legacy-onlinescreensaver.conf`,
+      MAARIF_LEGACY_JOB_2: `${root}/legacy-maarif-dashboard.conf`,
       CURL_BIN: `${commands}/curl`,
       CONVERT_BIN: `${commands}/convert`,
       IDENTIFY_BIN: `${commands}/identify`,
@@ -289,6 +291,8 @@ test('install persists the upstart job, enables the daemon and restores root rea
   const upstart = `${h.root}/upstart`;
   const job = `${upstart}/maarif.conf`;
   mkdirSync(upstart);
+  writeFileSync(h.env.MAARIF_LEGACY_JOB_1, 'legacy online job');
+  writeFileSync(h.env.MAARIF_LEGACY_JOB_2, 'legacy dashboard job');
 
   const result = run('install.sh', [], {
     ...h.env,
@@ -297,6 +301,8 @@ test('install persists the upstart job, enables the daemon and restores root rea
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(`${h.base}/enabled`), true);
   assert.deepEqual(readFileSync(job), readFileSync(`${extension}/bin/maarif.conf`));
+  assert.equal(existsSync(h.env.MAARIF_LEGACY_JOB_1), false);
+  assert.equal(existsSync(h.env.MAARIF_LEGACY_JOB_2), false);
   const commands = readFileSync(h.commandLog, 'utf8');
   assert.match(commands, /mntroot:rw[\s\S]*mntroot:ro/);
   assert.match(commands, /start:maarif/);

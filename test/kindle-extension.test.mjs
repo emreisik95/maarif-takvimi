@@ -86,6 +86,8 @@ test('install and uninstall always restore the Kindle root filesystem read-only'
   assert.match(install, /START_BIN.*maarif/);
   assert.match(install, /onlinescreensaver.*scheduler\.sh/);
   assert.match(install, /maarif-dashboard.*loop\.sh/);
+  assert.match(install, /\/etc\/upstart\/onlinescreensaver\.conf/);
+  assert.match(install, /\/etc\/upstart\/maarif-dashboard\.conf/);
   assert.match(uninstall, /STOP_BIN.*maarif/);
 });
 

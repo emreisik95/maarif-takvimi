@@ -10,6 +10,8 @@ UPSTART_JOB="${MAARIF_UPSTART_JOB:-/etc/upstart/maarif.conf}"
 MNTROOT_BIN="${MNTROOT_BIN:-mntroot}"
 START_BIN="${START_BIN:-start}"
 STOP_BIN="${STOP_BIN:-stop}"
+LEGACY_JOB_1="${MAARIF_LEGACY_JOB_1:-/etc/upstart/onlinescreensaver.conf}"
+LEGACY_JOB_2="${MAARIF_LEGACY_JOB_2:-/etc/upstart/maarif-dashboard.conf}"
 ROOT_RW=0
 JOB_TMP="${UPSTART_JOB}.tmp.$$"
 
@@ -34,12 +36,28 @@ rollback_installed_job() {
 }
 
 stop_legacy_schedulers() {
+  "$STOP_BIN" onlinescreensaver >/dev/null 2>&1 || true
+  "$STOP_BIN" maarif-dashboard >/dev/null 2>&1 || true
   for LEGACY_PATTERN in 'onlinescreensaver/bin/scheduler.sh' 'maarif-dashboard/bin/loop.sh'; do
     LEGACY_PIDS=$(ps xa 2>/dev/null | grep "$LEGACY_PATTERN" | grep -v grep | "$AWK_BIN" '{print $1}')
     for LEGACY_PID in $LEGACY_PIDS; do
       [ "$LEGACY_PID" = "$$" ] || kill "$LEGACY_PID" >/dev/null 2>&1 || true
     done
   done
+}
+
+remove_legacy_upstart_jobs() {
+  [ -e "$LEGACY_JOB_1" ] || [ -e "$LEGACY_JOB_2" ] || return 0
+  if ! "$MNTROOT_BIN" rw >/dev/null 2>&1; then
+    return 1
+  fi
+  ROOT_RW=1
+  rm -f "$LEGACY_JOB_1" "$LEGACY_JOB_2" || {
+    remount_ro
+    return 1
+  }
+  "$SYNC_BIN" >/dev/null 2>&1 || true
+  remount_ro
 }
 
 mkdir -p "$STATE_DIR" || exit 1
@@ -79,6 +97,10 @@ if ! "$START_BIN" maarif >/dev/null 2>&1; then
   rm -f "$ENABLED_FILE"
   rollback_installed_job
   log_message "upstart job installed but could not be started"
+  exit 1
+fi
+if ! remove_legacy_upstart_jobs; then
+  log_message "new service started but legacy upstart cleanup failed"
   exit 1
 fi
 stop_legacy_schedulers
