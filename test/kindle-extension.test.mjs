@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 test('Kindle lock screen automation updates the linkss screensaver image safely', () => {
   const config = readFileSync('kindle/extensions/onlinescreensaver/bin/config.sh', 'utf8');
   const updateScript = readFileSync('kindle/extensions/onlinescreensaver/bin/update.sh', 'utf8');
-  const dashboardScript = readFileSync('kindle/extensions/maarif-dashboard/bin/show.sh', 'utf8');
   const menu = readFileSync('kindle/extensions/onlinescreensaver/menu.json', 'utf8');
   const diagnoseScript = readFileSync('kindle/extensions/onlinescreensaver/bin/diagnose.sh', 'utf8');
 
@@ -36,8 +36,50 @@ test('Kindle lock screen automation updates the linkss screensaver image safely'
   assert.match(menu, /Write diagnostics log/);
   assert.match(diagnoseScript, /mount \| grep -E 'blanket\|custom_screensavers\|linkss'/);
   assert.match(diagnoseScript, /lipc-get-prop com\.lab126\.powerd preventScreenSaver/);
+});
 
-  assert.match(dashboardScript, /-gravity center -extent/);
-  assert.match(dashboardScript, /-define png:color-type=0/);
-  assert.doesNotMatch(dashboardScript, /PNG8:|MAARIF_SCREEN_SIZE[^\n]*}!/);
+test('KUAL exposes exactly one Maarif menu', () => {
+  const extensionRoot = 'kindle/extensions';
+  const menuFiles = readdirSync(extensionRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(extensionRoot, entry.name, 'menu.json'))
+    .filter(existsSync);
+
+  const maarifMenus = menuFiles.flatMap((path) => {
+    const json = JSON.parse(readFileSync(path, 'utf8'));
+    return (json.items || []).filter((item) => /Maarif/i.test(item.name || ''));
+  });
+
+  assert.equal(maarifMenus.length, 1);
+  assert.equal(existsSync(join(extensionRoot, 'maarif-dashboard')), false);
+});
+
+test('the single KUAL menu provides detailed refresh, layout, orientation, and diagnostic settings', () => {
+  const menu = JSON.parse(readFileSync('kindle/extensions/onlinescreensaver/menu.json', 'utf8'));
+  const settingsPath = 'kindle/extensions/onlinescreensaver/bin/settings.sh';
+  const statusPath = 'kindle/extensions/onlinescreensaver/bin/status.sh';
+
+  assert.equal(existsSync(settingsPath), true);
+  assert.equal(existsSync(statusPath), true);
+
+  const rootItems = menu.items?.[0]?.items || [];
+  for (const group of ['Refresh & schedule', 'Layout', 'Orientation', 'Status & diagnostics']) {
+    assert.ok(rootItems.some((item) => item.name === group), group);
+  }
+
+  const menuText = JSON.stringify(menu);
+  for (const param of [
+    'interval_60', 'interval_180', 'interval_360',
+    'layout_auto', 'layout_date', 'layout_agenda',
+    'orientation_right', 'orientation_left',
+  ]) {
+    assert.match(menuText, new RegExp(`"params":"${param}"`));
+  }
+
+  const settings = readFileSync(settingsPath, 'utf8');
+  assert.match(settings, /image-landscape\/auto\.png/);
+  assert.match(settings, /image-landscape\/date-focus\.png/);
+  assert.match(settings, /image-landscape\/agenda-focus\.png/);
+  assert.match(settings, /IMAGE_ROTATION/);
+  assert.match(settings, /SCHEDULE/);
 });

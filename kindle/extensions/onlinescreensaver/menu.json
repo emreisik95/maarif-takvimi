@@ -1,39 +1,152 @@
 {
-	"items": [
-		{
-			"name": "Maarif Lock Screen",
-			"items": [
-				{
-					"name": "Update lock image now",
-					"priority": 0,
-					"action": "bin/update.sh"
-				},
-				{
-					"name": "Start 3h lock refresh",
-					"priority": 0,
-					"action": "bin/enable.sh"
-				},
-				{
-					"name": "Stop lock refresh",
-					"priority": 0,
-					"action": "bin/disable.sh"
-				},
-				{
-					"name": "Reset sleep blockers",
-					"priority": 0,
-					"action": "bin/reset-sleep.sh"
-				},
-				{
-					"name": "Write diagnostics log",
-					"priority": 0,
-					"action": "bin/diagnose.sh"
-				},
-				{
-					"name": "Sleep diagnostic (60s)",
-					"priority": 0,
-					"action": "bin/sleepdiag.sh"
-				}
-			]
-		}
-	]
+  "items": [
+    {
+      "name": "Maarif Lock Screen",
+      "priority": -900,
+      "items": [
+        {
+          "name": "Update image now",
+          "priority": -950,
+          "action": "./bin/update.sh",
+          "exitmenu": true,
+          "refresh": false,
+          "status": false,
+          "internal": "status Updating the Maarif lock image"
+        },
+        {
+          "name": "Refresh & schedule",
+          "priority": -940,
+          "items": [
+            {
+              "name": "Start automatic refresh",
+              "action": "./bin/enable.sh",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false,
+              "internal": "status Maarif refresh started"
+            },
+            {
+              "name": "Stop automatic refresh",
+              "action": "./bin/disable.sh",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false,
+              "internal": "status Maarif refresh stopped"
+            },
+            {
+              "name": "Refresh every 1 hour",
+              "action": "./bin/settings.sh",
+              "params": "interval_60",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            },
+            {
+              "name": "Refresh every 3 hours",
+              "action": "./bin/settings.sh",
+              "params": "interval_180",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            },
+            {
+              "name": "Refresh every 6 hours",
+              "action": "./bin/settings.sh",
+              "params": "interval_360",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            }
+          ]
+        },
+        {
+          "name": "Layout",
+          "priority": -930,
+          "items": [
+            {
+              "name": "Automatic: date or agenda",
+              "action": "./bin/settings.sh",
+              "params": "layout_auto",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            },
+            {
+              "name": "Always large date",
+              "action": "./bin/settings.sh",
+              "params": "layout_date",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            },
+            {
+              "name": "Always agenda focus",
+              "action": "./bin/settings.sh",
+              "params": "layout_agenda",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            }
+          ]
+        },
+        {
+          "name": "Orientation",
+          "priority": -920,
+          "items": [
+            {
+              "name": "Power button on right",
+              "action": "./bin/settings.sh",
+              "params": "orientation_right",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            },
+            {
+              "name": "Power button on left",
+              "action": "./bin/settings.sh",
+              "params": "orientation_left",
+              "exitmenu": false,
+              "refresh": true,
+              "status": false
+            }
+          ]
+        },
+        {
+          "name": "Status & diagnostics",
+          "priority": -910,
+          "items": [
+            {
+              "name": "Write current settings & status",
+              "action": "./bin/status.sh",
+              "exitmenu": false,
+              "refresh": false,
+              "status": false,
+              "internal": "status Maarif status written to USB"
+            },
+            {
+              "name": "Write diagnostics log",
+              "action": "./bin/diagnose.sh",
+              "exitmenu": false,
+              "refresh": false,
+              "status": false
+            },
+            {
+              "name": "Reset old sleep blockers",
+              "action": "./bin/reset-sleep.sh",
+              "exitmenu": false,
+              "refresh": false,
+              "status": false
+            },
+            {
+              "name": "Sleep diagnostic (60s)",
+              "action": "./bin/sleepdiag.sh",
+              "exitmenu": true,
+              "refresh": false,
+              "status": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

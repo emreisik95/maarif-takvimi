@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <extension>
 	<information>
-		<name>Online Screensaver</name>
-		<version>0.3</version>
-		<author>peterson</author>
+		<name>Maarif Lock Screen</name>
+		<version>2.0</version>
+		<author>Emre Isik</author>
 		<id>OnlineScreensaver</id>
 	</information>
 	<menus>
