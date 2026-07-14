@@ -47,7 +47,7 @@ Spawn the real shell entry points with a temporary `MAARIF_BASE`, `MAARIF_TARGET
 - 03:00:00 and 03:59:59 select white mode without invoking curl.
 - 04:00:00 selects normal mode and restores last-good before attempting download.
 - 04:00:01 schedules the next boundary at 07:00.
-- 22:00 schedules midnight, midnight schedules 03:00.
+- 22:00 schedules 01:00, 01:00 schedules the special 03:00 white boundary.
 - successful PNG normalization atomically updates target and last-good.
 - failed download leaves a valid target untouched.
 - failed download with a missing target restores verified last-good.

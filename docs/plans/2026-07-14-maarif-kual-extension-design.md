@@ -24,9 +24,9 @@ durumda yeniden salt-okunur yapılır.
 
 `daemon.sh` tek süreçtir ve PID kilidiyle ikinci kopyayı engeller. Göreli
 `sleep 10800` zinciri kullanılmaz. Bunun yerine her döngüde bir sonraki duvar
-saati sınırı hesaplanır: 03:00, 04:00 ve 04:00'ten sonra üç saatlik sınırlar
-(07:00, 10:00, 13:00, 16:00, 19:00, 22:00); gece de beyaz pencereye yetişmek
-için 00:00 ve 03:00 sınırları korunur. Kindle uykuya geçerken `rtcWakeup`
+saati sınırı hesaplanır: normal görsel için üç saatlik sınırlar (01:00, 04:00,
+07:00, 10:00, 13:00, 16:00, 19:00, 22:00) ve beyaz pencere için ek 03:00
+sınırı. Kindle uykuya geçerken `rtcWakeup`
 kalan saniyeye ayarlanır; beklenmeyen erken uyanış döngüyü bozmaz, hedef saate
 kadar yeniden beklenir. Saat geriye/ileriye alınırsa hedef her turda yeniden
 hesaplanır.

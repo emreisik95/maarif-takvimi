@@ -75,6 +75,7 @@ fi
   `.trim());
   executable(`${commands}/lipc-get-prop`, `
 case "$*" in
+  *userstoreIsAvailable*) printf '%s\\n' "${'${STUB_USERSTORE:-1}'}" ;;
   *wirelessEnable*) printf '1\\n' ;;
   *status*) printf 'Screen Saver\\n' ;;
   *) printf '0\\n' ;;
@@ -84,6 +85,9 @@ esac
   executable(`${commands}/eips`, 'echo "eips:$*" >> "$STUB_COMMAND_LOG"');
   executable(`${commands}/sync`, 'echo sync >> "$STUB_COMMAND_LOG"');
   executable(`${commands}/sleep`, 'echo "sleep:$*" >> "$STUB_COMMAND_LOG"');
+  executable(`${commands}/mntroot`, 'echo "mntroot:$*" >> "$STUB_COMMAND_LOG"');
+  executable(`${commands}/start`, 'echo "start:$*" >> "$STUB_COMMAND_LOG"');
+  executable(`${commands}/stop`, 'echo "stop:$*" >> "$STUB_COMMAND_LOG"');
   executable(`${commands}/date`, `
 if [ "$1" = "+%s" ]; then
   count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
@@ -113,6 +117,7 @@ printf '%s\\n' "$((count + 1))" > "$STUB_EVENT_COUNT"
     log,
     downloaded,
     normalized,
+    commands,
     lastGood: `${base}/state/last-good.png`,
     fallback: `${base}/assets/fallback.png`,
     white: `${base}/assets/white.png`,
@@ -130,6 +135,9 @@ printf '%s\\n' "$((count + 1))" > "$STUB_EVENT_COUNT"
       SYNC_BIN: `${commands}/sync`,
       SLEEP_BIN: `${commands}/sleep`,
       DATE_BIN: `${commands}/date`,
+      MNTROOT_BIN: `${commands}/mntroot`,
+      START_BIN: `${commands}/start`,
+      STOP_BIN: `${commands}/stop`,
       STUB_COMMAND_LOG: commandLog,
       STUB_DOWNLOAD: downloaded,
       STUB_NORMALIZED: normalized,
@@ -158,8 +166,9 @@ test('schedule aligns updates to exact wall-clock boundaries', () => {
     ['03:00:00', '3600'],
     ['03:59:59', '1'],
     ['04:00:01', '10799'],
-    ['22:00:00', '7200'],
-    ['00:00:00', '10800'],
+    ['22:00:00', '10800'],
+    ['00:00:00', '3600'],
+    ['01:00:00', '7200'],
   ];
 
   for (const [now, seconds] of cases) {
@@ -182,6 +191,15 @@ test('an early wake does not complete the wait and suspend gets the remaining RT
   assert.match(commands, /wait:100/);
   assert.match(commands, /wait:90/);
   assert.match(commands, /setprop:-i com\.lab126\.powerd rtcWakeup 90/);
+});
+
+test('userstore availability prevents writes while USB mass storage owns the volume', () => {
+  const h = harness();
+  assert.equal(output('schedule.sh', ['userstore'], { ...h.env, STUB_USERSTORE: '1' }), 'available');
+
+  const unavailable = run('schedule.sh', ['userstore'], { ...h.env, STUB_USERSTORE: '0' });
+  assert.notEqual(unavailable.status, 0);
+  assert.equal(unavailable.stdout.trim(), 'unavailable');
 });
 
 test('03:xx installs white without networking or replacing last-good', () => {
@@ -264,4 +282,81 @@ test('an all-black last-good is rejected and replaced by the packaged fallback',
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(readFileSync(h.target), readFileSync(h.fallback));
   assert.deepEqual(readFileSync(h.lastGood), readFileSync(h.fallback));
+});
+
+test('install persists the upstart job, enables the daemon and restores root read-only', () => {
+  const h = harness();
+  const upstart = `${h.root}/upstart`;
+  const job = `${upstart}/maarif.conf`;
+  mkdirSync(upstart);
+
+  const result = run('install.sh', [], {
+    ...h.env,
+    MAARIF_UPSTART_JOB: job,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(`${h.base}/enabled`), true);
+  assert.deepEqual(readFileSync(job), readFileSync(`${extension}/bin/maarif.conf`));
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /mntroot:rw[\s\S]*mntroot:ro/);
+  assert.match(commands, /start:maarif/);
+});
+
+test('a failed upstart copy still restores root read-only and does not enable', () => {
+  const h = harness();
+  const upstart = `${h.root}/upstart`;
+  mkdirSync(upstart);
+  executable(`${h.commands}/cp`, `
+case "$1" in
+  *maarif.conf) echo cp-failed >> "$STUB_COMMAND_LOG"; exit 1 ;;
+  *) exec /bin/cp "$@" ;;
+esac
+  `.trim());
+
+  const result = run('install.sh', [], {
+    ...h.env,
+    MAARIF_UPSTART_JOB: `${upstart}/maarif.conf`,
+    PATH: `${h.commands}:${process.env.PATH}`,
+  });
+  assert.notEqual(result.status, 0);
+  assert.equal(existsSync(`${h.base}/enabled`), false);
+  assert.match(readFileSync(h.commandLog, 'utf8'), /mntroot:rw[\s\S]*cp-failed[\s\S]*mntroot:ro/);
+});
+
+test('a failed service start rolls back the upstart job and enabled marker', () => {
+  const h = harness();
+  const upstart = `${h.root}/upstart`;
+  const job = `${upstart}/maarif.conf`;
+  mkdirSync(upstart);
+  executable(`${h.commands}/start`, 'echo "start:$*" >> "$STUB_COMMAND_LOG"; exit 1');
+
+  const result = run('install.sh', [], {
+    ...h.env,
+    MAARIF_UPSTART_JOB: job,
+  });
+  assert.notEqual(result.status, 0);
+  assert.equal(existsSync(job), false);
+  assert.equal(existsSync(`${h.base}/enabled`), false);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /start:maarif[\s\S]*mntroot:rw[\s\S]*mntroot:ro/);
+});
+
+test('uninstall stops the service, removes its job and restores root read-only', () => {
+  const h = harness();
+  const upstart = `${h.root}/upstart`;
+  const job = `${upstart}/maarif.conf`;
+  mkdirSync(upstart);
+  writeFileSync(job, 'installed job');
+  writeFileSync(`${h.base}/enabled`, '');
+
+  const result = run('uninstall.sh', [], {
+    ...h.env,
+    MAARIF_UPSTART_JOB: job,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(job), false);
+  assert.equal(existsSync(`${h.base}/enabled`), false);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /stop:maarif/);
+  assert.match(commands, /mntroot:rw[\s\S]*mntroot:ro/);
 });

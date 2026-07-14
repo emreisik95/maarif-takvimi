@@ -42,7 +42,8 @@ test('configuration targets the production landscape dashboard and Kindle panel'
   assert.match(config, /SCREEN_SIZE=.*600x800/);
   assert.match(config, /IMAGE_ROTATION=.*90/);
   assert.match(config, /TARGET_IMAGE=.*\/mnt\/us\/linkss\/screensavers\/bg_ss00\.png/);
-  assert.match(config, /LAST_GOOD_IMAGE=.*state\/last-good\.png/);
+  assert.match(config, /STATE_DIR=.*MAARIF_BASE\/state/);
+  assert.match(config, /LAST_GOOD_IMAGE=.*STATE_DIR\/last-good\.png/);
   assert.match(config, /DOWNLOAD_ATTEMPTS=.*3/);
 });
 
@@ -54,11 +55,13 @@ test('upstart owns a reboot-persistent single foreground daemon', () => {
   assert.match(job, /stop on stopping lab126_gui/);
   assert.match(job, /^respawn$/m);
   assert.match(job, /respawn limit 5 60/);
-  assert.match(job, /\/mnt\/us\/extensions\/maarif\/enabled/);
-  assert.match(job, /exec \/bin\/sh \/mnt\/us\/extensions\/maarif\/bin\/daemon\.sh/);
+  assert.match(job, /\/mnt\/base-us\/extensions\/maarif\/enabled/);
+  assert.match(job, /MAARIF_BASE=\/mnt\/us\/extensions\/maarif/);
+  assert.match(job, /exec \/bin\/sh \/mnt\/base-us\/extensions\/maarif\/bin\/daemon\.sh/);
   assert.match(daemon, /mkdir "\$LOCK_DIR"/);
   assert.match(daemon, /kill -0/);
   assert.match(daemon, /trap .*cleanup/);
+  assert.match(daemon, /userstore_available/);
   assert.doesNotMatch(daemon, /sleep 10800/);
 });
 
@@ -67,22 +70,24 @@ test('install and uninstall always restore the Kindle root filesystem read-only'
   const uninstall = read('bin/uninstall.sh');
 
   for (const script of [install, uninstall]) {
-    assert.match(script, /mntroot rw/);
-    assert.match(script, /mntroot ro/);
+    assert.match(script, /MNTROOT_BIN.*rw/);
+    assert.match(script, /MNTROOT_BIN.*ro/);
     assert.match(script, /trap .*remount_ro/);
     assert.match(script, /\/etc\/upstart\/maarif\.conf/);
   }
-  assert.match(install, /maarif\.conf\.tmp\.\$\$/);
-  assert.match(install, /mv .*maarif\.conf/);
-  assert.match(install, /start maarif/);
-  assert.match(uninstall, /stop maarif/);
+  assert.match(install, /UPSTART_JOB.*\.tmp\.\$\$/);
+  assert.match(install, /mv .*UPSTART_JOB/);
+  assert.match(install, /START_BIN.*maarif/);
+  assert.match(install, /onlinescreensaver.*scheduler\.sh/);
+  assert.match(install, /maarif-dashboard.*loop\.sh/);
+  assert.match(uninstall, /STOP_BIN.*maarif/);
 });
 
 test('refresh validates, normalizes and commits images transactionally', () => {
   const refresh = read('bin/refresh.sh');
   const library = read('bin/lib.sh');
 
-  assert.match(refresh, /curl .*--connect-timeout/);
+  assert.match(refresh, /CURL_BIN.*--connect-timeout/);
   assert.match(refresh, /normalize_image/);
   assert.match(refresh, /validate_normal_image/);
   assert.match(refresh, /LAST_GOOD_IMAGE.*\.tmp\.\$\$/);

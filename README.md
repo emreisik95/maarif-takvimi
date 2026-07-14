@@ -109,18 +109,31 @@ Hedef cihaz: eski e-ink Kindle (test: Kindle Touch 7. nesil, 600×800).
 3 saattir (`10800` saniye). Stok tarayıcı tam kiosk/fullscreen vermeyebilir;
 sayfa buna rağmen tek PNG'yi taşmadan viewport'a sığdırır.
 
-**Sağlam yol:** jailbreak + KUAL ile `/image.png`'i doğrudan ekrana bas:
+**Sağlam yol:** jailbreak + KUAL + linkss ile repodaki tek `maarif`
+extension'ını kur. Kindle USB diski bağlıyken:
 
 ```sh
-while true; do
-  curl -s -o /tmp/dash.png "http://SUNUCUN/image.png"
-  eips -g /tmp/dash.png
-  sleep 300
-done
+cp -R kindle/extensions/maarif /Volumes/Kindle/extensions/
 ```
 
-Eski Kindle'ların TLS yığını zayıftır — sunucuyu HTTP'den de erişilebilir tut
-(HTTPS zorlaması yapma).
+Kindle'ı güvenle çıkardıktan sonra KUAL → **Maarif → Kur ve başlat** seçeneğine
+bir kez dokun. Bu işlem `/etc/upstart/maarif.conf` işini kurar; zamanlayıcı
+reboot sonrasında KUAL açılmadan otomatik başlar.
+
+Zamanlayıcı göreli `sleep` zinciri kullanmaz; duvar saatinde 01:00, 03:00,
+04:00, 07:00, 10:00, 13:00, 16:00, 19:00 ve 22:00 sınırlarına hizalanır.
+03:00–03:59 arasında ağ isteği yapmadan tamamen beyaz ekran gösterir. 04:00'te
+önce doğrulanmış son görseli geri getirir, sonra güncel görseli indirmeyi dener.
+İnternet, TLS, PNG veya dönüşüm hatasında çalışan ekran dosyasına dokunulmaz;
+doğrulanmış `state/last-good.png` kullanılmaya devam eder. İndirilen dosyalar
+yalnızca 600×800, 8-bit gri ve boş olmayan PNG kontrolünden geçerse atomik olarak
+kurulur.
+
+KUAL → **Maarif → Durum yaz** işlemi servis, RTC, güç ve görsel bilgilerini
+`/mnt/us/maarif-status.log` dosyasına yazar. **Durdur** servisi geçici olarak
+durdurur; **Otomatik başlatmayı kaldır** upstart işini güvenli biçimde siler.
+USB mass-storage etkin olduğunda `com.lab126.volumd userstoreIsAvailable`
+kontrolü yazmayı durdurur; USB çıkarılınca zamanlayıcı kaldığı yerden devam eder.
 
 ## Mimari
 

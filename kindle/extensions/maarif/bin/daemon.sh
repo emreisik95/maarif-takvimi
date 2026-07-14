@@ -1,7 +1,7 @@
 #!/bin/sh
 set -u
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 MAARIF_BASE="${MAARIF_BASE:-$(dirname "$SCRIPT_DIR")}"
 . "$SCRIPT_DIR/config.sh"
 . "$SCRIPT_DIR/lib.sh"
@@ -27,13 +27,14 @@ fi
 printf '%s\n' "$$" > "$PID_FILE" || exit 1
 trap 'cleanup_daemon' 0 HUP INT TERM
 
-[ -f "$ENABLED_FILE" ] || {
-  log_message "daemon not enabled"
-  exit 0
-}
-
 log_message "daemon started pid=$$"
-while [ -f "$ENABLED_FILE" ]; do
+while :; do
+  if ! userstore_available; then
+    "$SLEEP_BIN" 60
+    continue
+  fi
+  [ -f "$ENABLED_FILE" ] || break
+
   /bin/sh "$SCRIPT_DIR/refresh.sh" auto || log_message "refresh cycle failed"
   [ -f "$ENABLED_FILE" ] || break
 
@@ -51,4 +52,3 @@ while [ -f "$ENABLED_FILE" ]; do
   }
 done
 log_message "daemon stopped"
-

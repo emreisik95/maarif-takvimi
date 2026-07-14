@@ -1,7 +1,7 @@
 #!/bin/sh
 set -u
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 MAARIF_BASE="${MAARIF_BASE:-$(dirname "$SCRIPT_DIR")}"
 . "$SCRIPT_DIR/config.sh"
 . "$SCRIPT_DIR/lib.sh"

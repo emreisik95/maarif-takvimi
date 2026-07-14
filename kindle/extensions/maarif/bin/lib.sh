@@ -53,13 +53,26 @@ current_mode() {
 seconds_to_next_boundary() {
   split_now || return 1
   NOW_SECONDS=$((NOW_HOUR * 3600 + NOW_MINUTE * 60 + NOW_SECOND))
-  for BOUNDARY in 10800 14400 25200 36000 46800 57600 68400 79200 86400; do
+  for BOUNDARY in 3600 10800 14400 25200 36000 46800 57600 68400 79200 90000; do
     if [ "$BOUNDARY" -gt "$NOW_SECONDS" ]; then
       printf '%s\n' "$((BOUNDARY - NOW_SECONDS))"
       return 0
     fi
   done
   return 1
+}
+
+userstore_available() {
+  USERSTORE_STATE=$("$LIPC_GET_BIN" com.lab126.volumd userstoreIsAvailable 2>/dev/null || true)
+  case "$USERSTORE_STATE" in
+    0) return 1 ;;
+    1) return 0 ;;
+  esac
+
+  # Older firmware may not expose the volumd property. In that case, require
+  # the normal FUSE path rather than ever writing through /mnt/base-us while
+  # USB mass storage is exported to a computer.
+  [ -d "$MAARIF_BASE" ] && [ -r "$MAARIF_BASE/bin/config.sh" ]
 }
 
 png_signature() {
@@ -178,4 +191,3 @@ wait_until_epoch() {
     fi
   done
 }
-
