@@ -16,6 +16,7 @@ test('Kindle lock screen automation updates the linkss screensaver image safely'
   assert.match(config, /SCREENSAVERFILE=\/mnt\/us\/linkss\/screensavers\/bg_ss00\.png/);
   assert.match(config, /LAST_GOOD_IMAGE=/);
   assert.match(config, /DOWNLOAD_ATTEMPTS=3/);
+  assert.match(config, /IMAGE_ROTATION=0/);
 
   assert.match(updateScript, /HOUR=\$\(date '\+%H'\)/);
   assert.match(updateScript, /\[ "\$HOUR" = "03" \]/);
@@ -29,6 +30,7 @@ test('Kindle lock screen automation updates the linkss screensaver image safely'
   assert.doesNotMatch(updateScript, /PNG8:|SCREEN_SIZE[^\n]*}!/);
   assert.doesNotMatch(updateScript, /\/bin\/ping|TEST_DOMAIN/);
   assert.match(updateScript, /LAST_GOOD_IMAGE/);
+  assert.match(updateScript, /IMAGE_ROTATION/);
   assert.match(updateScript, /rm -f "\$SCREENSAVERFOLDER"\/\*\.png/);
   assert.doesNotMatch(updateScript, /preventScreenSaver|stopSuspend|framework stop/);
   assert.match(menu, /Write diagnostics log/);

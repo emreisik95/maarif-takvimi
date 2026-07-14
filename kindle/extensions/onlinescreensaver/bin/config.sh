@@ -50,6 +50,11 @@ SCREENSAVERFILE=/mnt/us/linkss/screensavers/bg_ss00.png
 # to this so it always fills the screen 1:1. This device is 600x800.
 SCREEN_SIZE=600x800
 
+# Clockwise ImageMagick rotation before fitting to the panel. Keep 0 for the
+# portrait endpoint; use 90 or -90 with an 800x600 landscape endpoint depending
+# on which side of the Kindle will face upward.
+IMAGE_ROTATION=0
+
 # Whether to create log output (1) or not (0).
 LOGGING=1
 

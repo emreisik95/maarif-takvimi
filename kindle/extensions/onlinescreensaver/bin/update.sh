@@ -22,6 +22,7 @@ refresh_if_asleep() {
 }
 
 normalize_screensaver_image() {
+  ROTATION="${1:-${IMAGE_ROTATION:-0}}"
   CONVERT_BIN="${CONVERT:-/mnt/us/linkss/bin/convert}"
   NORMALIZED="${TMPFILE}.normalized.png"
   TARGET_SIZE="${SCREEN_SIZE:-600x800}"
@@ -35,6 +36,7 @@ normalize_screensaver_image() {
   # type 0. Palette output (type 3) can make this Kindle's eips misread scanlines.
   rm -f "$NORMALIZED"
   if "$CONVERT_BIN" "$TMPFILE" \
+    -background white -rotate "$ROTATION" \
     -resize "$TARGET_SIZE" \
     -background white -gravity center -extent "$TARGET_SIZE" \
     -alpha remove -alpha off -colorspace Gray -type Grayscale -depth 8 \
@@ -49,8 +51,9 @@ normalize_screensaver_image() {
 }
 
 install_screensaver_file() {
+  ROTATION="${1:-${IMAGE_ROTATION:-0}}"
   mkdir -p "$SCREENSAVERFOLDER"
-  normalize_screensaver_image || return 1
+  normalize_screensaver_image "$ROTATION" || return 1
   rm -f "$SCREENSAVERFOLDER"/*.png
   mv "$TMPFILE" "$SCREENSAVERFILE"
   logger "Screen saver image file updated: $SCREENSAVERFILE"
@@ -67,7 +70,8 @@ remember_last_good() {
 restore_last_good() {
   [ -s "$LAST_GOOD_IMAGE" ] || return 1
   cp "$LAST_GOOD_IMAGE" "$TMPFILE" || return 1
-  install_screensaver_file || return 1
+  # The backup is copied from the already panel-oriented installed image.
+  install_screensaver_file 0 || return 1
   logger "Last-known-good image restored"
 }
 
@@ -105,7 +109,7 @@ if [ "$HOUR" = "03" ] && [ -s "$WHITE_IMAGE" ]; then
     remember_last_good || logger "Could not seed last-known-good image"
   fi
   cp "$WHITE_IMAGE" "$TMPFILE"
-  if install_screensaver_file; then
+  if install_screensaver_file 0; then
     logger "03:00 white window displayed"
     exit 0
   fi

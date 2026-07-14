@@ -45,7 +45,27 @@ test('03:00 white window preserves the calendar and 04:00 restores it before net
   assert.match(readFileSync(h.eipsLog, 'utf8'), /-f -g/);
 });
 
-function createHarness(t, { hour, installed, curlSucceedsOn }) {
+test('fresh landscape downloads rotate once while last-known-good recovery does not rotate again', (t) => {
+  const h = createHarness(t, {
+    hour: '10', installed: 'old-calendar', curlSucceedsOn: 1, imageRotation: -90,
+  });
+
+  h.runUpdate();
+  assert.match(readFileSync(h.convertLog, 'utf8'), /-rotate -90/);
+  assert.equal(readFileSync(h.lastGood, 'utf8'), 'fresh-calendar');
+
+  h.clearConvertLog();
+  h.setHour('04');
+  h.setCurlSucceedsOn(999);
+  h.resetCurlAttempts();
+  h.runUpdate();
+
+  const recoveryArgs = readFileSync(h.convertLog, 'utf8');
+  assert.doesNotMatch(recoveryArgs, /-rotate -90/);
+  assert.equal(readFileSync(h.installed, 'utf8'), 'fresh-calendar');
+});
+
+function createHarness(t, { hour, installed, curlSucceedsOn, imageRotation = 0 }) {
   const root = mkdtempSync(join(tmpdir(), 'maarif-kindle-test-'));
   const extension = join(root, 'extension', 'bin');
   const screensavers = join(root, 'screensavers');
@@ -85,6 +105,7 @@ LAST_GOOD_IMAGE="${lastGood}"
 SCREENSAVERFOLDER="${screensavers}/"
 SCREENSAVERFILE="${installedPath}"
 SCREEN_SIZE=600x800
+IMAGE_ROTATION=${imageRotation}
 LOGGING=1
 LOGFILE="${log}"
 DISABLE_WIFI=0
@@ -187,6 +208,12 @@ printf '%s\\n' "$*" >> "$SLEEP_LOG"
     resetCurlAttempts() {
       rmSync(curlCount, { force: true });
     },
+    setCurlSucceedsOn(value) {
+      env.CURL_SUCCEED_ON = String(value);
+    },
+    clearConvertLog() {
+      rmSync(convertLog, { force: true });
+    },
   };
 }
 
@@ -194,4 +221,3 @@ function executable(path, body) {
   writeFileSync(path, body);
   chmodSync(path, 0o755);
 }
-
