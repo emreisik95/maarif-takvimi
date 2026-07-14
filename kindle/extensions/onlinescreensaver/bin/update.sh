@@ -15,10 +15,11 @@ else
 fi
 
 refresh_if_asleep() {
-  lipc-get-prop com.lab126.powerd status | grep "Screen Saver" >/dev/null 2>&1 && (
+  if lipc-get-prop com.lab126.powerd status | grep "Screen Saver" >/dev/null 2>&1; then
     logger "Updating image on screen"
-    eips -f -g "$SCREENSAVERFILE"
-  )
+    eips -f -g "$SCREENSAVERFILE" || logger "Could not refresh current screen"
+  fi
+  return 0
 }
 
 normalize_screensaver_image() {

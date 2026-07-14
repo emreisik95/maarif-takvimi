@@ -65,7 +65,31 @@ test('fresh landscape downloads rotate once while last-known-good recovery does 
   assert.equal(readFileSync(h.installed, 'utf8'), 'fresh-calendar');
 });
 
-function createHarness(t, { hour, installed, curlSucceedsOn, imageRotation = 0 }) {
+test('an awake Kindle keeps a successful download instead of restoring the old backup', (t) => {
+  const h = createHarness(t, {
+    hour: '10',
+    installed: 'old-calendar',
+    lastGoodContent: 'old-calendar',
+    curlSucceedsOn: 1,
+    powerStatus: 'Active',
+  });
+
+  const result = h.runUpdate();
+
+  assert.equal(result.status, 0);
+  assert.equal(readFileSync(h.installed, 'utf8'), 'fresh-calendar');
+  assert.equal(readFileSync(h.lastGood, 'utf8'), 'fresh-calendar');
+  assert.doesNotMatch(readFileSync(h.log, 'utf8'), /Downloaded image could not be installed/);
+});
+
+function createHarness(t, {
+  hour,
+  installed,
+  curlSucceedsOn,
+  imageRotation = 0,
+  lastGoodContent,
+  powerStatus = 'Screen Saver',
+}) {
   const root = mkdtempSync(join(tmpdir(), 'maarif-kindle-test-'));
   const extension = join(root, 'extension', 'bin');
   const screensavers = join(root, 'screensavers');
@@ -95,6 +119,7 @@ function createHarness(t, { hour, installed, curlSucceedsOn, imageRotation = 0 }
   writeFileSync(white, 'white');
   writeFileSync(curlSource, 'fresh-calendar');
   writeFileSync(hourFile, hour);
+  if (lastGoodContent != null) writeFileSync(lastGood, lastGoodContent);
 
   writeFileSync(join(extension, 'config.sh'), `
 DEFAULTINTERVAL=180
@@ -159,7 +184,7 @@ cp "$IN" "$OUT"
   executable(join(fakeBin, 'lipc-get-prop'), `#!/bin/sh
 case "$*" in
   *wirelessEnable*) printf '%s\\n' 1 ;;
-  *status*) printf '%s\\n' 'Screen Saver' ;;
+  *status*) printf '%s\\n' "$POWER_STATUS" ;;
 esac
 `);
   executable(join(fakeBin, 'lipc-set-prop'), `#!/bin/sh
@@ -183,6 +208,7 @@ printf '%s\\n' "$*" >> "$SLEEP_LOG"
     EIPS_LOG: eipsLog,
     LIPC_LOG: lipcLog,
     SLEEP_LOG: sleepLog,
+    POWER_STATUS: powerStatus,
   };
 
   return {
@@ -190,6 +216,7 @@ printf '%s\\n' "$*" >> "$SLEEP_LOG"
     lastGood,
     convertLog,
     eipsLog,
+    log,
     runUpdate() {
       const result = spawnSync('/bin/sh', [join(extension, 'update.sh')], {
         cwd: extension,
