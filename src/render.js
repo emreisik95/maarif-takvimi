@@ -492,6 +492,28 @@ function landscapeQuote(model) {
   return p.join('');
 }
 
+function landscapeSolarStrip(model) {
+  const weather = model.weather || {};
+  const cells = [
+    ['Gün doğumu', weather.gunDogumu || '—'],
+    ['Gün batımı', weather.gunBatimi || '—'],
+    ['Gündüz süresi', weather.gunduzSuresi || '—'],
+  ];
+  const x = 30, y = 500, w = 740, h = 60;
+  const cellW = w / cells.length;
+  const p = [`<g data-section="solar">`, rect(x, y, w, h, 2.5)];
+
+  cells.forEach(([label, value], i) => {
+    const cx = x + cellW * (i + 0.5);
+    if (i > 0) p.push(line(x + cellW * i, y + 8, x + cellW * i, y + h - 8, 1.2));
+    p.push(txt(cx, y + 21, label, { size: 13, weight: 'bold', spacing: 0.5 }));
+    p.push(txt(cx, y + 47, value, { size: 20, weight: 'bold' }));
+  });
+
+  p.push('</g>');
+  return p.join('');
+}
+
 export function buildLandscapeSVG(model, variant = 'balanced') {
   if (!LANDSCAPE_VARIANTS.includes(variant)) throw new Error(`Unknown landscape layout: ${variant}`);
 
@@ -515,7 +537,8 @@ export function buildLandscapeSVG(model, variant = 'balanced') {
     s.push(landscapeWeatherStrip(model, 395, 375, 375, 100));
   }
 
-  s.push(landscapeQuote(model));
+  if (variant === 'date-focus') s.push(landscapeSolarStrip(model));
+  else s.push(landscapeQuote(model));
   s.push('</svg>');
   return s.join('\n');
 }

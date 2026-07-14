@@ -10,7 +10,10 @@ const model = {
   hicri: { yil: 1448, ayAdi: 'Muharrem', gun: 29 },
   hizir: { tur: 'Hızır', gun: 70 },
   quote: 'Bugünün işini yarına bırakma.',
-  weather: { ok: true, ikon: 'sun', durum: 'Açık', gunduz: 32, gece: 20, nem: 42, ruzgar: 17 },
+  weather: {
+    ok: true, ikon: 'sun', durum: 'Açık', gunduz: 32, gece: 20, nem: 42, ruzgar: 17,
+    gunDogumu: '05:52', gunBatimi: '20:24', gunduzSuresi: '14 sa 32 dk',
+  },
   events: [
     { time: '09:00', title: 'Proje değerlendirme toplantısı' },
     { time: '11:30', title: 'Tasarım geri bildirimleri' },
@@ -31,4 +34,3 @@ for (const variant of LANDSCAPE_VARIANTS) {
   writeFileSync(`docs/landscape-options/${variant}.png`, png);
   console.log(`${variant}: ${png.length} bytes`);
 }
-
