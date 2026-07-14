@@ -83,9 +83,11 @@ attempt and sleep only between failures.
 
 **Step 3: Preserve and restore the last-known-good image**
 
-At 03:00, copy the installed calendar to `LAST_GOOD_IMAGE` before installing
-white. On any normal download failure, restore `LAST_GOOD_IMAGE` when available;
-this guarantees 04:00 recovery without network.
+Keep `LAST_GOOD_IMAGE` current after every successful calendar install. At 03:00,
+seed it from the installed calendar only when no backup exists, then install
+white. At 04:00 restore `LAST_GOOD_IMAGE` before any network wait; on other normal
+download failures restore it after retries. This guarantees prompt 04:00 recovery
+without network and prevents a repeated 03:00 run from backing up white.
 
 **Step 4: Run focused and full tests**
 
@@ -123,4 +125,3 @@ artifacts and document that runtime starts after safe USB eject/disconnect.
 
 The current live server already emits 600x800 8-bit grayscale PNG. Do not create
 an unnecessary CapRover release unless server behavior changes during the fix.
-

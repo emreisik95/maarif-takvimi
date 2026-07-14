@@ -40,9 +40,9 @@ to 600x800 grayscale -> atomically replace linkss image -> repaint if asleep.
 03:00 path: copy the current calendar to last-known-good -> normalize/install
 white -> wait until the scheduler's 04:00 boundary.
 
-Post-03:00 failure path: exhausted download retries -> copy last-known-good to the
-temporary file -> normalize/install -> repaint if asleep -> keep the backup for
-future recovery.
+04:00 path: restore last-known-good and repaint immediately -> attempt the fresh
+download afterward. Other download-failure paths also restore last-known-good
+after retries are exhausted. The backup remains available for future recovery.
 
 All transitions log their outcome. Temporary downloads and normalization files
 are removed on failure, and a failed candidate never overwrites the installed
@@ -56,4 +56,3 @@ post-window restoration on download failure, and normalization arguments that
 preserve aspect ratio and force PNG color type 0. Existing server tests continue
 to verify the 3-hour browser interval, and PNG header checks verify that both
 local and live server output are 600x800, 8-bit grayscale.
-
