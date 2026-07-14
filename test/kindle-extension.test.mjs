@@ -1,29 +1,95 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-test('Kindle lock screen automation updates the linkss screensaver image safely', () => {
-  const config = readFileSync('kindle/extensions/onlinescreensaver/bin/config.sh', 'utf8');
-  const updateScript = readFileSync('kindle/extensions/onlinescreensaver/bin/update.sh', 'utf8');
-  const menu = readFileSync('kindle/extensions/onlinescreensaver/menu.json', 'utf8');
-  const diagnoseScript = readFileSync('kindle/extensions/onlinescreensaver/bin/diagnose.sh', 'utf8');
+const root = 'kindle/extensions/maarif';
+const read = (path) => readFileSync(`${root}/${path}`, 'utf8');
 
-  assert.match(config, /DEFAULTINTERVAL=180/);
-  assert.match(config, /SCHEDULE="00:00-03:00=60 03:00-04:00=60 04:00-24:00=180"/);
-  assert.match(config, /IMAGE_URI="https:\/\/maarif-takvimi\.external\.emre\.zip\/image\.png"/);
-  assert.match(config, /WHITE_IMAGE="\/mnt\/us\/extensions\/onlinescreensaver\/bin\/white\.png"/);
-  assert.match(config, /SCREENSAVERFILE=\/mnt\/us\/linkss\/screensavers\/bg_ss00\.png/);
+test('one Maarif extension replaces both legacy schedulers', () => {
+  assert.equal(existsSync(root), true, 'new maarif extension must exist');
+  assert.equal(existsSync('kindle/extensions/maarif-dashboard'), false);
+  assert.equal(existsSync('kindle/extensions/onlinescreensaver'), false);
+});
 
-  assert.match(updateScript, /HOUR=\$\(date '\+%H'\)/);
-  assert.match(updateScript, /\[ "\$HOUR" = "03" \]/);
-  assert.match(updateScript, /cp "\$WHITE_IMAGE" "\$TMPFILE"/);
-  assert.match(updateScript, /normalize_screensaver_image\(\)/);
-  assert.match(updateScript, /\/mnt\/us\/linkss\/bin\/convert/);
-  assert.match(updateScript, /-alpha remove -alpha off/);
-  assert.match(updateScript, /-colorspace Gray -type Grayscale -depth 8/);
-  assert.match(updateScript, /rm -f "\$SCREENSAVERFOLDER"\/\*\.png/);
-  assert.doesNotMatch(updateScript, /preventScreenSaver|stopSuspend|framework stop/);
-  assert.match(menu, /Write diagnostics log/);
-  assert.match(diagnoseScript, /mount \| grep -E 'blanket\|custom_screensavers\|linkss'/);
-  assert.match(diagnoseScript, /lipc-get-prop com\.lab126\.powerd preventScreenSaver/);
+test('KUAL metadata exposes only the supported lifecycle actions', () => {
+  const config = read('config.xml');
+  const menu = JSON.parse(read('menu.json'));
+  const extension = menu.items?.[0];
+
+  assert.match(config, /<name>Maarif Dashboard<\/name>/);
+  assert.match(config, /<id>maarif-dashboard<\/id>/);
+  assert.equal(extension?.name, 'Maarif');
+  assert.deepEqual(
+    extension.items.map(({ name, action }) => ({ name, action })),
+    [
+      { name: 'Kur ve başlat', action: 'bin/install.sh' },
+      { name: 'Şimdi güncelle', action: 'bin/refresh.sh' },
+      { name: 'Durdur', action: 'bin/stop.sh' },
+      { name: 'Durum yaz', action: 'bin/status.sh' },
+      { name: 'Otomatik başlatmayı kaldır', action: 'bin/uninstall.sh' },
+    ],
+  );
+
+  for (const { action } of extension.items) {
+    assert.equal(existsSync(`${root}/${action}`), true, `${action} must exist`);
+  }
+});
+
+test('configuration targets the production landscape dashboard and Kindle panel', () => {
+  const config = read('bin/config.sh');
+
+  assert.match(config, /IMAGE_URL=.*image-landscape\/auto\.png/);
+  assert.match(config, /SCREEN_SIZE=.*600x800/);
+  assert.match(config, /IMAGE_ROTATION=.*90/);
+  assert.match(config, /TARGET_IMAGE=.*\/mnt\/us\/linkss\/screensavers\/bg_ss00\.png/);
+  assert.match(config, /LAST_GOOD_IMAGE=.*state\/last-good\.png/);
+  assert.match(config, /DOWNLOAD_ATTEMPTS=.*3/);
+});
+
+test('upstart owns a reboot-persistent single foreground daemon', () => {
+  const job = read('bin/maarif.conf');
+  const daemon = read('bin/daemon.sh');
+
+  assert.match(job, /start on started lab126_gui/);
+  assert.match(job, /stop on stopping lab126_gui/);
+  assert.match(job, /^respawn$/m);
+  assert.match(job, /respawn limit 5 60/);
+  assert.match(job, /\/mnt\/us\/extensions\/maarif\/enabled/);
+  assert.match(job, /exec \/bin\/sh \/mnt\/us\/extensions\/maarif\/bin\/daemon\.sh/);
+  assert.match(daemon, /mkdir "\$LOCK_DIR"/);
+  assert.match(daemon, /kill -0/);
+  assert.match(daemon, /trap .*cleanup/);
+  assert.doesNotMatch(daemon, /sleep 10800/);
+});
+
+test('install and uninstall always restore the Kindle root filesystem read-only', () => {
+  const install = read('bin/install.sh');
+  const uninstall = read('bin/uninstall.sh');
+
+  for (const script of [install, uninstall]) {
+    assert.match(script, /mntroot rw/);
+    assert.match(script, /mntroot ro/);
+    assert.match(script, /trap .*remount_ro/);
+    assert.match(script, /\/etc\/upstart\/maarif\.conf/);
+  }
+  assert.match(install, /maarif\.conf\.tmp\.\$\$/);
+  assert.match(install, /mv .*maarif\.conf/);
+  assert.match(install, /start maarif/);
+  assert.match(uninstall, /stop maarif/);
+});
+
+test('refresh validates, normalizes and commits images transactionally', () => {
+  const refresh = read('bin/refresh.sh');
+  const library = read('bin/lib.sh');
+
+  assert.match(refresh, /curl .*--connect-timeout/);
+  assert.match(refresh, /normalize_image/);
+  assert.match(refresh, /validate_normal_image/);
+  assert.match(refresh, /LAST_GOOD_IMAGE.*\.tmp\.\$\$/);
+  assert.match(refresh, /TARGET_IMAGE.*\.tmp\.\$\$/);
+  assert.match(refresh, /mv .*LAST_GOOD_IMAGE/);
+  assert.match(refresh, /mv .*TARGET_IMAGE/);
+  assert.match(library, /89504e470d0a1a0a/);
+  assert.match(library, /standard_deviation/);
+  assert.match(library, /600 800 8/);
 });
