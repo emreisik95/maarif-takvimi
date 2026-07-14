@@ -75,7 +75,7 @@ Sık kullanılanlar:
 |----------|--------------|
 | `CALENDAR_ICS_URL` | Google Takvim gizli iCal adresi (Ayarlar → Takvimi entegre et → "iCal biçiminde gizli adres"). **Gizli tut.** |
 | `WEATHER_LAT` / `WEATHER_LON` | Konumun koordinatları |
-| `WEATHER_LABEL` | Sağ kutu başlığı, örn. `İstanbul|Kadıköy|Hava` |
+| `WEATHER_LABEL` | Sağ kutudaki konum başlığı, örn. `İstanbul|Kadıköy` |
 | `HEADER_TEXT` / `FOOTER_TEXT` | Üst başlık / sağ alttaki form yazısı |
 | `QUOTES_FILE` | Kendi söz listen (JSON string dizisi) |
 | `CALENDAR_HIDE` | Gizlenecek etkinlik anahtar kelimeleri |

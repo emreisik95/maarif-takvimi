@@ -11,6 +11,7 @@ const model = {
   hicri: { yil: 1448, ayAdi: 'Muharrem', gun: 29 },
   hizir: { tur: 'Hızır', gun: 70 },
   quote: 'Vakit nakittir.',
+  names: { girl: 'Defne', boy: 'Kerem' },
   weather: {
     ok: true, ikon: 'sun', durum: 'Açık', gunduz: 32, gece: 20, nem: 42, ruzgar: 17,
     gunDogumu: '05:52', gunBatimi: '20:24', gunduzSuresi: '14 sa 32 dk',
@@ -44,6 +45,12 @@ test('landscape renderer exposes three selectable 800x600 compositions', () => {
     if (variant === 'date-focus') {
       assert.match(svg, /data-section="solar"/);
       assert.doesNotMatch(svg, />Vakit nakittir\.</);
+      assert.match(svg, />Muğla · Ortaköy</);
+      assert.doesNotMatch(svg, /Muğla · Ortaköy · Hava/);
+      assert.doesNotMatch(svg, />14 temmuz</);
+      assert.match(svg, />Bugün doğanlara verilecek isimler</);
+      assert.match(svg, />Kız: Defne</);
+      assert.match(svg, />Erkek: Kerem</);
     } else {
       assert.match(svg, />Vakit nakittir\.</);
     }
@@ -82,6 +89,9 @@ test('automatic landscape emphasizes the date only when the agenda is empty', ()
   assert.match(emptySvg, />14 sa 32 dk</);
   assert.match(emptySvg, />TEMMUZ</);
   assert.match(emptySvg, />Açık</);
+  assert.match(emptySvg, />Bugün doğanlara verilecek isimler</);
+  assert.match(emptySvg, />Kız: Defne</);
+  assert.match(emptySvg, />Erkek: Kerem</);
   assert.match(
     render.buildLandscapeSVG(populatedModel, render.selectLandscapeVariant(populatedModel)),
     /data-layout="agenda-focus"/,

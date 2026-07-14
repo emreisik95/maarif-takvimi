@@ -10,6 +10,7 @@ const model = {
   hicri: { yil: 1448, ayAdi: 'Muharrem', gun: 29 },
   hizir: { tur: 'Hızır', gun: 70 },
   quote: 'Bugünün işini yarına bırakma.',
+  names: { girl: 'Defne', boy: 'Kerem' },
   weather: {
     ok: true, ikon: 'sun', durum: 'Açık', gunduz: 32, gece: 20, nem: 42, ruzgar: 17,
     gunDogumu: '05:52', gunBatimi: '20:24', gunduzSuresi: '14 sa 32 dk',

@@ -13,7 +13,11 @@ const DISPLAY_EM = 0.44; // Bebas Neue ~0.44 em/karakter
 const HEADER_TEXT = process.env.HEADER_TEXT || 'Büyük saatli Maarif takvimi';
 const FOOTER_TEXT = process.env.FOOTER_TEXT || 'F. 18—2';
 // "|" ile satırlara bölünür
-const WEATHER_LABEL = (process.env.WEATHER_LABEL || 'Muğla|Ortaköy|Hava').split('|').slice(0, 3);
+const WEATHER_LABEL = (process.env.WEATHER_LABEL || 'Muğla|Ortaköy')
+  .split('|')
+  .map((part) => part.trim())
+  .filter((part) => part && part.toLocaleLowerCase('tr-TR') !== 'hava')
+  .slice(0, 2);
 const CALENDAR_TITLE = (process.env.CALENDAR_TITLE || 'Google|Takvim').split('|').slice(0, 2);
 
 function esc(s) {
@@ -438,8 +442,20 @@ function landscapeWeatherBox(model, x, y, w, h) {
   p.push(txt(x + w / 2, y + 253, `Rüzgar ${wind}`, {
     size: fitSerif(`Rüzgar ${wind}`, w - 18, 17),
   }));
-  p.push(txt(x + w / 2, y + h - 27, `${model.effective.day} ${model.monthName.toLocaleLowerCase('tr-TR')}`, {
-    size: 15, style: 'italic', weight: 'bold',
+  p.push(line(x + 18, y + 267, x + w - 18, y + 267, 1));
+
+  const names = model.names || {};
+  const nameTitle = 'Bugün doğanlara verilecek isimler';
+  const girl = `Kız: ${names.girl || '—'}`;
+  const boy = `Erkek: ${names.boy || '—'}`;
+  p.push(txt(x + w / 2, y + 285, nameTitle, {
+    size: fitSerif(nameTitle, w - 18, 12), weight: 'bold',
+  }));
+  p.push(txt(x + w / 2, y + 305, girl, {
+    size: fitSerif(girl, w - 20, 15), weight: 'bold',
+  }));
+  p.push(txt(x + w / 2, y + 324, boy, {
+    size: fitSerif(boy, w - 20, 15), weight: 'bold',
   }));
   return p.join('');
 }
