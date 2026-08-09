@@ -116,6 +116,9 @@ mkdir -p "$TARGET_PARENT" "$STATE_DIR" || exit 1
 cp "$NORMALIZED_TMP" "$LAST_GOOD_TMP" || exit 1
 cp "$NORMALIZED_TMP" "$TARGET_TMP" || exit 1
 "$SYNC_BIN" >/dev/null 2>&1 || true
+if install_white_if_auto_window; then
+  exit 0
+fi
 mv "$LAST_GOOD_TMP" "$LAST_GOOD_IMAGE" || exit 1
 mv "$TARGET_TMP" "$TARGET_IMAGE" || exit 1
 "$SYNC_BIN" >/dev/null 2>&1 || true

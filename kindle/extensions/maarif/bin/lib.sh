@@ -228,6 +228,12 @@ wait_until_epoch() {
       esac
     else
       WAIT_AFTER_EVENT=$("$DATE_BIN" '+%s') || return 1
+      if [ "$WAIT_AFTER_EVENT" -lt "$WAIT_LAST_NOW" ]; then
+        WAIT_RECALCULATED=$(seconds_to_next_boundary) || return 1
+        WAIT_TARGET=$((WAIT_AFTER_EVENT + WAIT_RECALCULATED))
+        log_message "clock moved backward during LIPC wait; boundary recomputed in ${WAIT_RECALCULATED}s"
+      fi
+      WAIT_LAST_NOW=$WAIT_AFTER_EVENT
       WAIT_FALLBACK_REMAINING=$((WAIT_TARGET - WAIT_AFTER_EVENT))
       if [ "$WAIT_FALLBACK_REMAINING" -gt 0 ]; then
         "$SLEEP_BIN" "$WAIT_FALLBACK_REMAINING"

@@ -272,6 +272,33 @@ exit 1
   assert.doesNotMatch(commands, /wait:18000/);
 });
 
+test('a backward correction on the LIPC failure path avoids a stale fallback sleep', () => {
+  const h = harness();
+  executable(`${h.commands}/date-backward-timeout`, `
+if [ "$1" = "+%s" ]; then
+  count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
+  case "$count" in 0) value=32400 ;; 1) value=18000 ;; *) value=36000 ;; esac
+  printf '%s\\n' "$((count + 1))" > "$STUB_DATE_COUNT"
+  printf '%s\\n' "$value"
+elif [ "$1" = "+%H:%M:%S" ]; then
+  printf '05:00:00\\n'
+else
+  printf '2026-07-14 05:00:00\\n'
+fi
+  `.trim());
+  executable(`${h.commands}/lipc-failure`, 'echo "wait:$2" >> "$STUB_COMMAND_LOG"; exit 1');
+
+  const result = run('schedule.sh', ['wait', '36000'], {
+    ...h.env,
+    DATE_BIN: `${h.commands}/date-backward-timeout`,
+    LIPC_WAIT_BIN: `${h.commands}/lipc-failure`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /wait:3600[\s\S]*sleep:7200/);
+  assert.doesNotMatch(commands, /sleep:18000/);
+});
+
 test('a failed boundary wait is retried without refreshing early', () => {
   const h = harness();
   const enabled = `${h.base}/enabled`;
@@ -404,6 +431,30 @@ fi
   assert.deepEqual(readFileSync(h.target), readFileSync(h.white));
   const commands = readFileSync(h.commandLog, 'utf8');
   assert.equal(commands.includes('curl'), false);
+});
+
+test('auto refresh rechecks the white window after the pre-commit sync', () => {
+  const h = harness();
+  writeFileSync(h.target, png('VALID_OLD'));
+  writeFileSync(h.lastGood, png('VALID_LAST_GOOD'));
+  executable(`${h.commands}/date-precommit`, `
+if [ "$1" = "+%H:%M:%S" ]; then
+  count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
+  case "$count" in 0|1|2|3) value=02:59:50 ;; *) value=03:00:05 ;; esac
+  printf '%s\\n' "$((count + 1))" > "$STUB_DATE_COUNT"
+  printf '%s\\n' "$value"
+else
+  printf '2026-07-14 03:00:05\\n'
+fi
+  `.trim());
+
+  const result = run('refresh.sh', [], {
+    ...h.env,
+    DATE_BIN: `${h.commands}/date-precommit`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readFileSync(h.target), readFileSync(h.white));
+  assert.deepEqual(readFileSync(h.lastGood), png('VALID_LAST_GOOD'));
 });
 
 test('a failed download leaves an existing valid target untouched', () => {
