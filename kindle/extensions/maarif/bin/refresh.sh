@@ -12,6 +12,7 @@ NORMALIZED_TMP="$STATE_DIR/normalized.$$.png"
 LAST_GOOD_TMP="${LAST_GOOD_IMAGE}.tmp.$$"
 TARGET_TMP="${TARGET_IMAGE}.tmp.$$"
 WIFI_WAS_OFF=0
+AUTO_MODE=0
 
 cleanup_refresh() {
   rm -f "$DOWNLOAD_TMP" "$NORMALIZED_TMP" "$LAST_GOOD_TMP" "$TARGET_TMP"
@@ -25,8 +26,16 @@ trap 'exit 1' HUP INT TERM
 
 requested_mode=${1:-auto}
 if [ "$requested_mode" = auto ]; then
+  AUTO_MODE=1
   requested_mode=$(current_mode) || exit 1
 fi
+
+install_white_if_auto_window() {
+  [ "$AUTO_MODE" -eq 1 ] || return 1
+  [ "$(current_mode)" = white ] || return 1
+  validate_panel_image "$WHITE_IMAGE" || return 1
+  install_display_image "$WHITE_IMAGE" "03:00 white window"
+}
 
 if [ "$requested_mode" = white ]; then
   validate_panel_image "$WHITE_IMAGE" || {
@@ -63,13 +72,20 @@ fi
 "$LIPC_SET_BIN" com.lab126.cmd wirelessEnable 1 >/dev/null 2>&1 || true
 log_message "Wi-Fi wake requested; waiting for connection"
 wait_for_wifi_connection
+if install_white_if_auto_window; then
+  exit 0
+fi
 
 ATTEMPT=1
 DOWNLOADED=0
 while [ "$ATTEMPT" -le "$DOWNLOAD_ATTEMPTS" ]; do
+  if install_white_if_auto_window; then
+    exit 0
+  fi
   rm -f "$DOWNLOAD_TMP"
   log_message "download attempt $ATTEMPT/$DOWNLOAD_ATTEMPTS"
-  if "$CURL_BIN" -f -k -L --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" \
+  if "$CURL_BIN" -f -L --cacert "$CA_CERT" \
+    --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" \
     -o "$DOWNLOAD_TMP" "$IMAGE_URL" && validate_png_signature "$DOWNLOAD_TMP"; then
     DOWNLOADED=1
     break
@@ -79,12 +95,19 @@ while [ "$ATTEMPT" -le "$DOWNLOAD_ATTEMPTS" ]; do
 done
 
 if [ "$DOWNLOADED" -ne 1 ]; then
+  if install_white_if_auto_window; then
+    exit 0
+  fi
   log_message "download failed; keeping verified offline image"
   exit 0
 fi
 
 if ! normalize_image "$DOWNLOAD_TMP" "$NORMALIZED_TMP"; then
   log_message "downloaded image validation or normalization failed"
+  exit 0
+fi
+
+if install_white_if_auto_window; then
   exit 0
 fi
 

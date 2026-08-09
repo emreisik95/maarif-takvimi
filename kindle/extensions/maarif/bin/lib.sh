@@ -205,8 +205,15 @@ wait_for_wifi_connection() {
 
 wait_until_epoch() {
   WAIT_TARGET=$1
+  WAIT_LAST_NOW=
   while :; do
     WAIT_NOW=$("$DATE_BIN" '+%s') || return 1
+    if [ -n "$WAIT_LAST_NOW" ] && [ "$WAIT_NOW" -lt "$WAIT_LAST_NOW" ]; then
+      WAIT_RECALCULATED=$(seconds_to_next_boundary) || return 1
+      WAIT_TARGET=$((WAIT_NOW + WAIT_RECALCULATED))
+      log_message "clock moved backward; boundary recomputed in ${WAIT_RECALCULATED}s"
+    fi
+    WAIT_LAST_NOW=$WAIT_NOW
     WAIT_REMAINING=$((WAIT_TARGET - WAIT_NOW))
     [ "$WAIT_REMAINING" -gt 0 ] || return 0
 
@@ -220,7 +227,11 @@ wait_until_epoch() {
           ;;
       esac
     else
-      "$SLEEP_BIN" "$WAIT_REMAINING"
+      WAIT_AFTER_EVENT=$("$DATE_BIN" '+%s') || return 1
+      WAIT_FALLBACK_REMAINING=$((WAIT_TARGET - WAIT_AFTER_EVENT))
+      if [ "$WAIT_FALLBACK_REMAINING" -gt 0 ]; then
+        "$SLEEP_BIN" "$WAIT_FALLBACK_REMAINING"
+      fi
     fi
   done
 }

@@ -210,6 +210,68 @@ test('an early wake does not complete the wait and suspend gets the remaining RT
   assert.match(commands, /setprop:-i com\.lab126\.powerd rtcWakeup 90/);
 });
 
+test('an LIPC timeout does not sleep the completed interval a second time', () => {
+  const h = harness();
+  executable(`${h.commands}/date-timeout`, `
+if [ "$1" = "+%s" ]; then
+  count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
+  case "$count" in 0) value=0 ;; *) value=100 ;; esac
+  printf '%s\\n' "$((count + 1))" > "$STUB_DATE_COUNT"
+  printf '%s\\n' "$value"
+else
+  printf '2026-07-14 00:00:00\\n'
+fi
+  `.trim());
+  executable(`${h.commands}/lipc-timeout`, 'echo "wait:$2" >> "$STUB_COMMAND_LOG"; exit 1');
+
+  const result = run('schedule.sh', ['wait', '100'], {
+    ...h.env,
+    DATE_BIN: `${h.commands}/date-timeout`,
+    LIPC_WAIT_BIN: `${h.commands}/lipc-timeout`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /wait:100/);
+  assert.doesNotMatch(commands, /sleep:/);
+});
+
+test('a backward clock correction recomputes the next wall-clock boundary', () => {
+  const h = harness();
+  executable(`${h.commands}/date-backward`, `
+if [ "$1" = "+%s" ]; then
+  count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
+  case "$count" in
+    0) value=32400 ;;
+    1) value=18000 ;;
+    *) value=36000 ;;
+  esac
+  printf '%s\\n' "$((count + 1))" > "$STUB_DATE_COUNT"
+  printf '%s\\n' "$value"
+elif [ "$1" = "+%H:%M:%S" ]; then
+  printf '05:00:00\\n'
+else
+  printf '2026-07-14 05:00:00\\n'
+fi
+  `.trim());
+  executable(`${h.commands}/lipc-backward`, `
+count=$(cat "$STUB_EVENT_COUNT" 2>/dev/null || printf '0')
+echo "wait:$2" >> "$STUB_COMMAND_LOG"
+printf '%s\\n' "$((count + 1))" > "$STUB_EVENT_COUNT"
+[ "$count" -eq 0 ] && { printf 'wakeupFromSuspend\\n'; exit 0; }
+exit 1
+  `.trim());
+
+  const result = run('schedule.sh', ['wait', '36000'], {
+    ...h.env,
+    DATE_BIN: `${h.commands}/date-backward`,
+    LIPC_WAIT_BIN: `${h.commands}/lipc-backward`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /wait:3600[\s\S]*wait:7200/);
+  assert.doesNotMatch(commands, /wait:18000/);
+});
+
 test('a failed boundary wait is retried without refreshing early', () => {
   const h = harness();
   const enabled = `${h.base}/enabled`;
@@ -317,6 +379,31 @@ test('normal refresh gives old firmware a full warmup when wifid state is unavai
   assert.match(commands, /setprop:com\.lab126\.cmd wirelessEnable 1/);
   assert.equal((commands.match(/^sleep:5$/gm) ?? []).length, 3);
   assert.ok(commands.indexOf('sleep:5') < commands.indexOf('curl'));
+});
+
+test('auto refresh switches to white if network warmup crosses into 03:00', () => {
+  const h = harness();
+  writeFileSync(h.target, png('VALID_OLD'));
+  writeFileSync(h.lastGood, png('VALID_LAST_GOOD'));
+  executable(`${h.commands}/date-crossover`, `
+if [ "$1" = "+%H:%M:%S" ]; then
+  count=$(cat "$STUB_DATE_COUNT" 2>/dev/null || printf '0')
+  case "$count" in 0) value=02:59:50 ;; *) value=03:00:05 ;; esac
+  printf '%s\\n' "$((count + 1))" > "$STUB_DATE_COUNT"
+  printf '%s\\n' "$value"
+else
+  printf '2026-07-14 03:00:05\\n'
+fi
+  `.trim());
+
+  const result = run('refresh.sh', [], {
+    ...h.env,
+    DATE_BIN: `${h.commands}/date-crossover`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readFileSync(h.target), readFileSync(h.white));
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.equal(commands.includes('curl'), false);
 });
 
 test('a failed download leaves an existing valid target untouched', () => {

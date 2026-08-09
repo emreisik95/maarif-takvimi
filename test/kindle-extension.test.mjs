@@ -98,8 +98,14 @@ test('install and uninstall always restore the Kindle root filesystem read-only'
 test('refresh validates, normalizes and commits images transactionally', () => {
   const refresh = read('bin/refresh.sh');
   const library = read('bin/lib.sh');
+  const config = read('bin/config.sh');
+  const caCertificate = read('assets/isrg-root-x1.pem');
 
-  assert.match(refresh, /CURL_BIN.*--connect-timeout/);
+  assert.match(refresh, /CURL_BIN[\s\S]*--connect-timeout/);
+  assert.match(config, /CA_CERT=.*MAARIF_BASE\/assets\/isrg-root-x1\.pem/);
+  assert.match(refresh, /--cacert "\$CA_CERT"/);
+  assert.doesNotMatch(refresh, /CURL_BIN[^\n]* -k /);
+  assert.match(caCertificate, /BEGIN CERTIFICATE/);
   assert.match(refresh, /normalize_image/);
   assert.match(refresh, /validate_normal_image/);
   assert.match(refresh, /LAST_GOOD_IMAGE.*\.tmp\.\$\$/);

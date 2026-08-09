@@ -11,6 +11,7 @@ TARGET_IMAGE="${MAARIF_TARGET_IMAGE:-/mnt/us/linkss/screensavers/bg_ss00.png}"
 LAST_GOOD_IMAGE="${MAARIF_LAST_GOOD_IMAGE:-$STATE_DIR/last-good.png}"
 WHITE_IMAGE="${MAARIF_WHITE_IMAGE:-$MAARIF_BASE/assets/white.png}"
 FALLBACK_IMAGE="${MAARIF_FALLBACK_IMAGE:-$MAARIF_BASE/assets/fallback.png}"
+CA_CERT="${MAARIF_CA_CERT:-$MAARIF_BASE/assets/isrg-root-x1.pem}"
 ENABLED_FILE="${MAARIF_ENABLED_FILE:-$MAARIF_BASE/enabled}"
 LOG_FILE="${MAARIF_LOG_FILE:-/mnt/us/maarif.log}"
 
