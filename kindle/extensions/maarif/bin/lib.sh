@@ -172,6 +172,37 @@ normalize_image() {
   validate_normal_image "$OUTPUT_IMAGE"
 }
 
+wait_for_wifi_connection() {
+  WIFI_WAITED=0
+  WIFI_UNKNOWN_WAITED=0
+
+  while [ "$WIFI_WAITED" -lt "$WIFI_CONNECT_TIMEOUT" ]; do
+    WIFI_CONNECTION_STATE=$("$LIPC_GET_BIN" com.lab126.wifid cmState 2>/dev/null || true)
+    case "$WIFI_CONNECTION_STATE" in
+      CONNECTED*)
+        log_message "Wi-Fi connected after ${WIFI_WAITED}s"
+        return 0
+        ;;
+      ''|0)
+        if [ "$WIFI_UNKNOWN_WAITED" -ge "$WIFI_UNKNOWN_WARMUP" ]; then
+          log_message "wifid connection state unavailable; trying download after ${WIFI_WAITED}s"
+          return 0
+        fi
+        WIFI_UNKNOWN_WAITED=$((WIFI_UNKNOWN_WAITED + WIFI_POLL_INTERVAL))
+        ;;
+      *)
+        WIFI_UNKNOWN_WAITED=0
+        ;;
+    esac
+
+    "$SLEEP_BIN" "$WIFI_POLL_INTERVAL"
+    WIFI_WAITED=$((WIFI_WAITED + WIFI_POLL_INTERVAL))
+  done
+
+  log_message "Wi-Fi not connected after ${WIFI_CONNECT_TIMEOUT}s; trying download"
+  return 0
+}
+
 wait_until_epoch() {
   WAIT_TARGET=$1
   while :; do

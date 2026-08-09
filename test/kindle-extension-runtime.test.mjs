@@ -76,6 +76,20 @@ fi
   executable(`${commands}/lipc-get-prop`, `
 case "$*" in
   *userstoreIsAvailable*) printf '%s\\n' "${'${STUB_USERSTORE:-1}'}" ;;
+  *cmState*)
+    if [ "${'${STUB_WIFI_STATE_UNKNOWN:-0}'}" = 1 ]; then
+      echo "getprop:$*" >> "$STUB_COMMAND_LOG"
+      exit 0
+    fi
+    count=$(cat "$STUB_WIFI_STATE_COUNT" 2>/dev/null || printf '0')
+    echo "getprop:$*" >> "$STUB_COMMAND_LOG"
+    case "$count" in
+      0) printf 'NOT_CONNECTED\\n' ;;
+      1) printf 'ASSOCIATING\\n' ;;
+      *) printf 'CONNECTED\\n' ;;
+    esac
+    printf '%s\\n' "$((count + 1))" > "$STUB_WIFI_STATE_COUNT"
+    ;;
   *wirelessEnable*) printf '1\\n' ;;
   *status*) printf 'Screen Saver\\n' ;;
   *) printf '0\\n' ;;
@@ -145,6 +159,7 @@ printf '%s\\n' "$((count + 1))" > "$STUB_EVENT_COUNT"
       STUB_NORMALIZED: normalized,
       STUB_DATE_COUNT: `${root}/date-count`,
       STUB_EVENT_COUNT: `${root}/event-count`,
+      STUB_WIFI_STATE_COUNT: `${root}/wifi-state-count`,
     },
   };
 }
@@ -271,6 +286,37 @@ test('a successful normal refresh commits the normalized image to target and las
   const commands = readFileSync(h.commandLog, 'utf8');
   assert.match(commands, /curl[\s\S]*convert[\s\S]*sync/);
   assert.ok((commands.match(/^sync$/gm) ?? []).length >= 2, 'rename metadata must also be synced');
+});
+
+test('normal refresh wakes Wi-Fi and waits for wifid connectivity before downloading', () => {
+  const h = harness();
+  writeFileSync(h.target, png('VALID_OLD'));
+  writeFileSync(h.lastGood, png('VALID_LAST_GOOD'));
+
+  const result = run('refresh.sh', ['normal'], { ...h.env, MAARIF_NOW: '10:00:00' });
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(
+    commands,
+    /setprop:com\.lab126\.cmd wirelessEnable 1[\s\S]*getprop:com\.lab126\.wifid cmState[\s\S]*getprop:com\.lab126\.wifid cmState[\s\S]*getprop:com\.lab126\.wifid cmState[\s\S]*curl/,
+  );
+});
+
+test('normal refresh gives old firmware a full warmup when wifid state is unavailable', () => {
+  const h = harness();
+  writeFileSync(h.target, png('VALID_OLD'));
+  writeFileSync(h.lastGood, png('VALID_LAST_GOOD'));
+
+  const result = run('refresh.sh', ['normal'], {
+    ...h.env,
+    MAARIF_NOW: '10:00:00',
+    STUB_WIFI_STATE_UNKNOWN: '1',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(h.commandLog, 'utf8');
+  assert.match(commands, /setprop:com\.lab126\.cmd wirelessEnable 1/);
+  assert.equal((commands.match(/^sleep:5$/gm) ?? []).length, 3);
+  assert.ok(commands.indexOf('sleep:5') < commands.indexOf('curl'));
 });
 
 test('a failed download leaves an existing valid target untouched', () => {

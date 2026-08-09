@@ -59,9 +59,10 @@ WIRELESS_STATE=$("$LIPC_GET_BIN" com.lab126.cmd wirelessEnable 2>/dev/null || pr
 if [ "$WIRELESS_STATE" = 0 ]; then
   WIFI_WAS_OFF=1
   log_message "Wi-Fi was off; enabling temporarily"
-  "$LIPC_SET_BIN" com.lab126.cmd wirelessEnable 1 >/dev/null 2>&1 || true
-  "$SLEEP_BIN" 2
 fi
+"$LIPC_SET_BIN" com.lab126.cmd wirelessEnable 1 >/dev/null 2>&1 || true
+log_message "Wi-Fi wake requested; waiting for connection"
+wait_for_wifi_connection
 
 ATTEMPT=1
 DOWNLOADED=0
