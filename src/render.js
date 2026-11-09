@@ -347,11 +347,12 @@ export function selectLandscapeVariant(model) {
 
 function landscapeHeader(model) {
   const p = [];
-  p.push(txt(122, 67, `Miladi ${model.effective.year}`, { size: 19, weight: 'bold' }));
-  p.push(txt(122, 92, `Ay ${model.effective.month} · Gün ${model.dayOfYear}`, { size: 17, weight: 'bold' }));
-  p.push(clock(400, 82, 35, model.now.hour, model.now.minute));
-  p.push(txt(678, 67, `Hicri ${model.hicri.yil}`, { size: 19, weight: 'bold' }));
-  p.push(txt(678, 92, `${model.hicri.gun} ${model.hicri.ayAdi}`, { size: 17, weight: 'bold' }));
+  p.push(txt(130, 70, `Miladi ${model.effective.year}`, { size: 22, weight: 'bold' }));
+  p.push(txt(130, 98, `Ay ${model.effective.month} · Gün ${model.dayOfYear}`, { size: 20, weight: 'bold' }));
+  p.push(clock(400, 84, 37, model.now.hour, model.now.minute));
+  p.push(txt(670, 70, `Hicri ${model.hicri.yil}`, { size: 22, weight: 'bold' }));
+  const hicri = `${model.hicri.gun} ${model.hicri.ayAdi}`;
+  p.push(txt(670, 98, hicri, { size: fitSerif(hicri, 230, 20), weight: 'bold' }));
   p.push(line(28, 128, 772, 128, 3));
   return p.join('');
 }
@@ -359,19 +360,50 @@ function landscapeHeader(model) {
 function landscapeCalendarBox(model, x, y, w, h, maxEvents = 4) {
   const p = [rect(x, y, w, h, 2.5)];
   const label = model.rolled ? 'YARININ AJANDASI' : 'BUGÜNÜN AJANDASI';
-  p.push(txt(x + w / 2, y + 31, label, {
-    size: fitSerif(label, w - 45, 19), weight: 'bold', spacing: 0.4,
+  p.push(txt(x + w / 2, y + 32, label, {
+    size: fitSerif(label, w - 40, 22), weight: 'bold', spacing: 0.4,
   }));
   p.push(line(x + 12, y + 48, x + w - 12, y + 48, 1.5));
 
-  const events = (model.events || []).slice(0, maxEvents);
+  const all = model.events || [];
+  const events = all.slice(0, maxEvents);
   if (!events.length) {
-    p.push(txt(x + w / 2, y + h / 2, 'Etkinlik yok', { size: 18, style: 'italic' }));
+    p.push(txt(x + w / 2, y + h / 2, 'Etkinlik yok', { size: 24, weight: 'bold', style: 'italic' }));
+    return p.join('');
+  }
+
+  const narrow = w < 210;
+  if (!narrow) {
+    // Uzaktan okunurluk: saat 26px, başlık 21px kalın (2. satır 19px).
+    // Saat sütunu 92px; "Tüm Gün" gibi uzun etiketler sütuna sığacak kadar küçülür.
+    const extra = all.length - events.length;
+    const rowH = (h - 58 - (extra > 0 ? 22 : 0)) / events.length;
+    const titleX = x + 108;
+    const titleW = w - 120;
+    events.forEach((event, i) => {
+      const top = y + 54 + i * rowH;
+      const lines = wrapTitle(displayTitle(event.title), Math.floor(titleW / 10.5));
+      const blockH = 21 + (lines.length - 1) * 22;
+      const base = top + (rowH - blockH) / 2 + 17;
+      p.push(`<g aria-label="${esc(`${event.time} ${event.title}`)}">`);
+      p.push(txt(x + 14, base + 2, event.time, {
+        size: event.time.length > 5 ? Math.min(19, fitSerif(event.time, 66, 19)) : 26, weight: 'bold', anchor: 'start',
+      }));
+      lines.forEach((title, j) => {
+        p.push(txt(titleX, base + j * 22, title, {
+          size: fitSerif(title, titleW, j === 0 ? 21 : 19), anchor: 'start', weight: 'bold',
+        }));
+      });
+      if (i < events.length - 1) p.push(line(x + 14, top + rowH, x + w - 14, top + rowH, 0.8));
+      p.push('</g>');
+    });
+    if (extra > 0) {
+      p.push(txt(x + w / 2, y + h - 10, `+${extra} etkinlik daha`, { size: 16, weight: 'bold', style: 'italic' }));
+    }
     return p.join('');
   }
 
   const rowH = (h - 64) / Math.max(maxEvents, events.length);
-  const narrow = w < 210;
   const titleChars = narrow
     ? Math.max(18, Math.floor((w - 30) / 6.5))
     : Math.max(16, Math.floor((w - 78) / 6.5));
@@ -400,6 +432,21 @@ function landscapeCalendarBox(model, x, y, w, h, maxEvents = 4) {
 function landscapeDateBox(model, x, y, w, h, focus = false) {
   const p = [rect(x, y, w, h, focus ? 3.5 : 2.5)];
   const compact = h < 260;
+  if (compact) {
+    const day = String(model.effective.day).padStart(2, '0');
+    const leftW = Math.round(w * 0.5);
+    p.push(txt(x + leftW / 2 + 6, y + h - 26, day, {
+      family: DISPLAY, size: Math.min(Math.floor((h - 40) / 0.72), Math.floor((leftW - 10) / 0.86)),
+    }));
+    p.push(line(x + leftW + 6, y + 18, x + leftW + 6, y + h - 18, 1.5));
+    const rx = x + leftW + 6 + (w - leftW - 6) / 2;
+    const rw = w - leftW - 30;
+    p.push(txt(rx, y + 78, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, rw, 60), spacing: 1 }));
+    p.push(txt(rx, y + 146, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, rw, 52) }));
+    const hz = `${model.hizir.tur} ${model.hizir.gun}`;
+    p.push(txt(rx, y + 186, hz, { size: fitSerif(hz, rw, 20), weight: 'bold' }));
+    return p.join('');
+  }
   const monthSize = fitSize(model.monthName, w - 30, compact ? 47 : focus ? 55 : 47);
   p.push(txt(x + w / 2, y + (compact ? 42 : 49), model.monthName, {
     family: DISPLAY, size: monthSize, spacing: 2,
@@ -411,11 +458,11 @@ function landscapeDateBox(model, x, y, w, h, focus = false) {
     ? Math.min(128, Math.floor(w * 0.7))
     : Math.min(focus ? 264 : 220, Math.floor(h * 0.7), Math.floor(w * 0.93));
   p.push(txt(x + w / 2, y + (compact ? 151 : h * 0.73), day, { family: DISPLAY, size: daySize }));
-  p.push(txt(x + w / 2, y + h - (compact ? 20 : 30), model.weekdayName, {
+  p.push(txt(x + w / 2, y + h - 32, model.weekdayName, {
     family: DISPLAY, size: fitSize(model.weekdayName, w - 30, compact ? 34 : focus ? 54 : 43), spacing: 1,
   }));
-  p.push(txt(x + w / 2, y + h - (compact ? 7 : 10), `${model.hizir.tur} ${model.hizir.gun}`, {
-    size: 13, weight: 'bold',
+  p.push(txt(x + w / 2, y + h - 9, `${model.hizir.tur} ${model.hizir.gun}`, {
+    size: 15, weight: 'bold',
   }));
   return p.join('');
 }
@@ -423,71 +470,73 @@ function landscapeDateBox(model, x, y, w, h, focus = false) {
 function landscapeWeatherBox(model, x, y, w, h) {
   const weather = model.weather;
   const p = [rect(x, y, w, h, 2.5)];
+  const cx = x + w / 2;
   const label = WEATHER_LABEL.join(' · ');
-  p.push(txt(x + w / 2, y + 30, label, {
-    size: fitSerif(label, w - 18, 18), weight: 'bold', spacing: 0.5,
+  p.push(txt(cx, y + 30, label, {
+    size: fitSerif(label, w - 18, 20), weight: 'bold', spacing: 0.5,
   }));
-  p.push(line(x + 12, y + 47, x + w - 12, y + 47, 1.5));
-  p.push(weatherIcon(weather.ikon, x + w / 2, y + 91));
-  p.push(txt(x + w / 2, y + 139, weather.durum, {
-    size: fitSerif(weather.durum, w - 20, 21), weight: 'bold',
-  }));
+  p.push(line(x + 12, y + 46, x + w - 12, y + 46, 1.5));
+
+  // İkon + durum yan yana, altında dev gündüz sıcaklığı
+  p.push(weatherIcon(weather.ikon, x + 48, y + 84));
+  const dl = wrapDurum(weather.durum);
+  if (dl.length === 1) {
+    p.push(txt(x + 92, y + 92, dl[0], { size: fitSerif(dl[0], w - 104, 22), anchor: 'start', weight: 'bold' }));
+  } else {
+    dl.forEach((l, i) => p.push(txt(x + 92, y + 80 + i * 21, l, {
+      size: fitSerif(l, w - 104, 18), anchor: 'start', weight: 'bold',
+    })));
+  }
 
   const day = weather.gunduz == null ? '—' : `${weather.gunduz}°`;
   const night = weather.gece == null ? '—' : `${weather.gece}°`;
-  p.push(txt(x + w / 2, y + 174, `Gündüz ${day}  ·  Gece ${night}`, {
-    size: fitSerif(`Gündüz ${day}  ·  Gece ${night}`, w - 18, 17), weight: 'bold',
-  }));
-  p.push(line(x + 18, y + 194, x + w - 18, y + 194, 1));
+  p.push(txt(cx, y + 186, day, { family: DISPLAY, size: fitSize(day, w - 30, 84) }));
+  const geceS = `Gece ${night}`;
+  p.push(txt(cx, y + 214, geceS, { size: 22, weight: 'bold' }));
 
   const humidity = weather.nem == null ? '—' : `%${weather.nem}`;
   const wind = weather.ruzgar == null ? '—' : `${weather.ruzgar} km/s`;
-  p.push(txt(x + w / 2, y + 225, `Nem ${humidity}`, { size: 17 }));
-  p.push(txt(x + w / 2, y + 253, `Rüzgar ${wind}`, {
-    size: fitSerif(`Rüzgar ${wind}`, w - 18, 17),
-  }));
-  p.push(line(x + 18, y + 267, x + w - 18, y + 267, 1));
+  const extra = `Nem ${humidity} · ${wind}`;
+  p.push(txt(cx, y + 240, extra, { size: fitSerif(extra, w - 18, 17), weight: 'bold' }));
+  p.push(line(x + 18, y + 254, x + w - 18, y + 254, 1));
 
   const names = model.names || {};
   const nameTitle = 'Bugün doğanlara verilecek isimler';
   const girl = `Kız: ${names.girl || '—'}`;
   const boy = `Erkek: ${names.boy || '—'}`;
-  p.push(txt(x + w / 2, y + 285, nameTitle, {
-    size: fitSerif(nameTitle, w - 18, 12), weight: 'bold',
+  p.push(txt(cx, y + 273, nameTitle, {
+    size: fitSerif(nameTitle, w - 18, 14), weight: 'bold',
   }));
-  p.push(txt(x + w / 2, y + 305, girl, {
-    size: fitSerif(girl, w - 20, 15), weight: 'bold',
+  p.push(txt(cx, y + 297, girl, {
+    size: fitSerif(girl, w - 20, 19), weight: 'bold',
   }));
-  p.push(txt(x + w / 2, y + 324, boy, {
-    size: fitSerif(boy, w - 20, 15), weight: 'bold',
+  p.push(txt(cx, y + 321, boy, {
+    size: fitSerif(boy, w - 20, 19), weight: 'bold',
   }));
   return p.join('');
 }
 
+// Ajanda düzeninin hava şeridi: ikon | dev sıcaklık | durum + gece + nem/rüzgar
 function landscapeWeatherStrip(model, x, y, w, h) {
   const weather = model.weather;
   const p = [rect(x, y, w, h, 2.5)];
-  p.push(weatherIcon(weather.ikon, x + 52, y + h / 2));
-  p.push(txt(x + 94, y + 34, weather.durum, {
-    size: fitSerif(weather.durum, 120, 21), anchor: 'start', weight: 'bold',
-  }));
-  p.push(txt(x + 94, y + 61, WEATHER_LABEL.join(' · '), {
-    size: fitSerif(WEATHER_LABEL.join(' · '), 126, 14), anchor: 'start',
-  }));
+  p.push(weatherIcon(weather.ikon, x + 44, y + h / 2 - 4));
   const day = weather.gunduz == null ? '—' : `${weather.gunduz}°`;
   const night = weather.gece == null ? '—' : `${weather.gece}°`;
   const humidity = weather.nem == null ? '—' : `%${weather.nem}`;
   const wind = weather.ruzgar == null ? '—' : `${weather.ruzgar} km/s`;
-  p.push(line(x + 226, y + 13, x + 226, y + h - 13, 1.2));
-  const rightWidth = w - 260;
-  p.push(txt(x + 248, y + 29, `Gündüz ${day}`, {
-    size: fitSerif(`Gündüz ${day}`, rightWidth, 15), anchor: 'start', weight: 'bold',
+  p.push(txt(x + 140, y + h - 18, day, { family: DISPLAY, size: fitSize(day, 110, 80) }));
+  p.push(line(x + 200, y + 12, x + 200, y + h - 12, 1.2));
+  const rx = x + 214;
+  const rw = w - 226;
+  p.push(txt(rx, y + 30, weather.durum, {
+    size: fitSerif(weather.durum, rw, 22), anchor: 'start', weight: 'bold',
   }));
-  p.push(txt(x + 248, y + 51, `Gece ${night}`, {
-    size: fitSerif(`Gece ${night}`, rightWidth, 15), anchor: 'start', weight: 'bold',
+  p.push(txt(rx, y + 58, `Gece ${night}`, {
+    size: fitSerif(`Gece ${night}`, rw, 21), anchor: 'start', weight: 'bold',
   }));
-  p.push(txt(x + 248, y + 74, `${humidity} · ${wind}`, {
-    size: fitSerif(`${humidity} · ${wind}`, rightWidth, 13), anchor: 'start',
+  p.push(txt(rx, y + 84, `${humidity} · ${wind}`, {
+    size: fitSerif(`${humidity} · ${wind}`, rw, 18), anchor: 'start', weight: 'bold',
   }));
   return p.join('');
 }
@@ -495,18 +544,18 @@ function landscapeWeatherStrip(model, x, y, w, h) {
 function landscapeQuote(model) {
   const quote = String(model.quote || '');
   const p = [line(28, 493, 772, 493, 3)];
-  if (quote.length <= 68) {
-    p.push(txt(400, 538, quote, {
-      size: fitSerif(quote, 690, 23), weight: 'bold', style: 'italic',
+  if (fitSerif(quote, 700, 28) >= 20) {
+    p.push(txt(400, 542, quote, {
+      size: fitSerif(quote, 700, 28), weight: 'bold', style: 'italic',
     }));
   } else {
     const midpoint = Math.floor(quote.length / 2);
     const split = quote.lastIndexOf(' ', midpoint);
     const first = split > 0 ? quote.slice(0, split) : quote;
     const second = split > 0 ? quote.slice(split + 1) : '';
-    const size = Math.min(17, fitSerif(first, 700, 17), fitSerif(second, 650, 17));
-    p.push(txt(400, 525, first, { size, weight: 'bold', style: 'italic' }));
-    if (second) p.push(txt(400, 548, second, { size, weight: 'bold', style: 'italic' }));
+    const size = Math.min(21, fitSerif(first, 720, 21), fitSerif(second, 680, 21));
+    p.push(txt(400, 526, first, { size, weight: 'bold', style: 'italic' }));
+    if (second) p.push(txt(400, 552, second, { size, weight: 'bold', style: 'italic' }));
   }
   p.push(txt(766, 574, FOOTER_TEXT, { size: 12, weight: 'bold', anchor: 'end' }));
   return p.join('');
@@ -526,8 +575,8 @@ function landscapeSolarStrip(model) {
   cells.forEach(([label, value], i) => {
     const cx = x + cellW * (i + 0.5);
     if (i > 0) p.push(line(x + cellW * i, y + 8, x + cellW * i, y + h - 8, 1.2));
-    p.push(txt(cx, y + 21, label, { size: 13, weight: 'bold', spacing: 0.5 }));
-    p.push(txt(cx, y + 47, value, { size: 20, weight: 'bold' }));
+    p.push(txt(cx, y + 21, label, { size: 15, weight: 'bold', spacing: 0.5 }));
+    p.push(txt(cx, y + 49, value, { size: 24, weight: 'bold' }));
   });
 
   p.push('</g>');
