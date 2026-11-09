@@ -59,9 +59,9 @@ function grayPng(gray, width, height) {
   ]);
 }
 
-export function svgToPng(svg) {
+export function svgToPng(svg, outWidth = OUT_WIDTH) {
   const resvg = new Resvg(svg, {
-    fitTo: { mode: 'width', value: OUT_WIDTH },
+    fitTo: { mode: 'width', value: outWidth },
     background: 'white',
     font: {
       fontFiles: FONT_FILES,

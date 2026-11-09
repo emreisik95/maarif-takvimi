@@ -6,15 +6,15 @@ const W = 600;
 const H = 800;
 
 // Büyük tarih öğeleri (ay adı, gün no, gün adı) fontu — condensed grotesk.
-const DISPLAY = 'Bebas Neue';
+export const DISPLAY = 'Bebas Neue';
 const DISPLAY_EM = 0.44; // Bebas Neue ~0.44 em/karakter
 
 // Kişiselleştirilebilir metinler (bkz. .env.example)
-const HEADER_TEXT = process.env.HEADER_TEXT || 'Büyük saatli Maarif takvimi';
-const FOOTER_TEXT = process.env.FOOTER_TEXT || 'F. 18—2';
+export const HEADER_TEXT = process.env.HEADER_TEXT || 'Büyük saatli Maarif takvimi';
+export const FOOTER_TEXT = process.env.FOOTER_TEXT || 'F. 18—2';
 // "|" ile satırlara bölünür
-const WEATHER_LABEL = (process.env.WEATHER_LABEL || 'Muğla|Ortaköy|Hava').split('|').slice(0, 3);
-const CALENDAR_TITLE = (process.env.CALENDAR_TITLE || 'Google|Takvim').split('|').slice(0, 2);
+export const WEATHER_LABEL = (process.env.WEATHER_LABEL || 'Muğla|Ortaköy|Hava').split('|').slice(0, 3);
+export const CALENDAR_TITLE = (process.env.CALENDAR_TITLE || 'Google|Takvim').split('|').slice(0, 2);
 
 function esc(s) {
   return String(s ?? '')
@@ -24,7 +24,7 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function txt(x, y, s, o = {}) {
+export function txt(x, y, s, o = {}) {
   const {
     size = 20, family = 'PT Serif', weight = 'normal', style = 'normal',
     anchor = 'middle', fill = '#000', spacing = 0, textLength,
@@ -42,20 +42,20 @@ function txt(x, y, s, o = {}) {
   return `<text ${a.join(' ')}>${esc(s)}</text>`;
 }
 
-function line(x1, y1, x2, y2, w = 1) {
+export function line(x1, y1, x2, y2, w = 1) {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#000" stroke-width="${w}" stroke-linecap="butt"/>`;
 }
-function rect(x, y, w, h, sw = 2) {
+export function rect(x, y, w, h, sw = 2) {
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#000" stroke-width="${sw}"/>`;
 }
 
 // Metni maxW'ye sığdıran, glifi BOZMAYAN font boyutu (display font oranıyla).
-function fitSize(s, maxW, base) {
+export function fitSize(s, maxW, base) {
   const len = Math.max(1, String(s).length);
   return Math.min(base, Math.floor(maxW / (DISPLAY_EM * len)));
 }
 // PT Serif (bold) için aynı mantık — ~0.52 em/karakter.
-function fitSerif(s, maxW, base) {
+export function fitSerif(s, maxW, base) {
   const len = Math.max(1, String(s).length);
   return Math.min(base, Math.floor(maxW / (0.52 * len)));
 }
@@ -66,7 +66,7 @@ function clip(s, n) {
 }
 
 // Etkinlik başlığını en fazla 2 satıra kelime sınırından sar.
-function wrapTitle(t, maxChars) {
+export function wrapTitle(t, maxChars) {
   const words = String(t).split(' ');
   const lines = [''];
   for (const w of words) {
@@ -86,13 +86,13 @@ function wrapTitle(t, maxChars) {
 }
 
 // "[Kraken Test Deadline] Last Chance ..." → köşeli etiket işin özü; onu göster.
-function displayTitle(t) {
+export function displayTitle(t) {
   const m = String(t).match(/^\[([^\]]{4,})\]/);
   return m ? m[1].trim() : String(t);
 }
 
 // --- Analog saat (mockup gibi sade: çentiksiz) ---
-function clock(cx, cy, r, hour, minute) {
+export function clock(cx, cy, r, hour, minute) {
   const p = [`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="#000" stroke-width="3"/>`];
   for (let n = 1; n <= 12; n++) {
     const a = (n * 30) * Math.PI / 180;
@@ -138,7 +138,7 @@ function sunRays(cx, cy, r) {
   }
   return p;
 }
-function weatherIcon(type, cx, cy) {
+export function weatherIcon(type, cx, cy) {
   switch (type) {
     case 'sun':
       return `<circle cx="${cx}" cy="${cy}" r="15" fill="#000"/>` + sunRays(cx, cy, 15);
@@ -165,7 +165,7 @@ function weatherIcon(type, cx, cy) {
 }
 
 // Durum metnini kutuya sığdır (gerekirse 2 satır)
-function wrapDurum(s) {
+export function wrapDurum(s) {
   s = String(s ?? '—');
   if (s.length <= 9 || !s.includes(' ')) return [s];
   const w = s.split(' ');
