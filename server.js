@@ -6,7 +6,6 @@
 import express from 'express';
 import { assembleModel } from './src/model.js';
 import { buildSVG } from './src/render.js';
-import { buildLandscapeSVG } from './src/render-landscape.js';
 import { svgToPng } from './src/raster.js';
 import { num } from './src/env.js';
 
@@ -14,33 +13,22 @@ const app = express();
 const PORT = num(process.env.PORT, 3000);
 const REFRESH = num(process.env.REFRESH_SECONDS, 10800); // e-ink dostu: 3 saat (bozuk env'de bile geçerli sayı)
 
-// Yön: ?o=yatay|landscape (veya ORIENTATION env). Yatayda ?r=90|270 döndürme
-// yönü (LANDSCAPE_ROTATE env, varsayılan 90); ?r=0 = döndürmeden 800x600 önizleme.
-function renderFor(model, query) {
-  const o = String(query.o ?? process.env.ORIENTATION ?? 'dikey').toLowerCase();
-  if (o !== 'yatay' && o !== 'landscape') return { svg: buildSVG(model), width: undefined };
-  const r = Number(query.r ?? process.env.LANDSCAPE_ROTATE ?? 90);
-  const rotate = [0, 90, 270].includes(r) ? r : 90;
-  return { svg: buildLandscapeSVG(model, rotate), width: rotate === 0 ? 800 : undefined };
-}
-
 app.get('/health', (_req, res) => res.type('text').send('ok'));
 
-app.get('/image.svg', async (req, res) => {
+app.get('/image.svg', async (_req, res) => {
   try {
     const model = await assembleModel();
-    res.type('image/svg+xml').set('Cache-Control', 'no-store').send(renderFor(model, req.query).svg);
+    res.type('image/svg+xml').set('Cache-Control', 'no-store').send(buildSVG(model));
   } catch (err) {
     console.error(err);
     res.status(500).type('text').send('render error: ' + err.message);
   }
 });
 
-app.get('/image.png', async (req, res) => {
+app.get('/image.png', async (_req, res) => {
   try {
     const model = await assembleModel();
-    const { svg, width } = renderFor(model, req.query);
-    const png = svgToPng(svg, width);
+    const png = svgToPng(buildSVG(model));
     res.type('image/png').set('Cache-Control', 'no-store').send(png);
   } catch (err) {
     console.error(err);
