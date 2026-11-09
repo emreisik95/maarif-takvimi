@@ -37,7 +37,10 @@ async function fetchOnce() {
   const url = new URL('https://api.open-meteo.com/v1/forecast');
   url.searchParams.set('latitude', LAT);
   url.searchParams.set('longitude', LON);
-  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max');
+  url.searchParams.set(
+    'daily',
+    'temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max,sunrise,sunset,daylight_duration',
+  );
   url.searchParams.set('hourly', 'relative_humidity_2m');
   url.searchParams.set('timezone', 'Europe/Istanbul');
   url.searchParams.set('forecast_days', '3');
@@ -63,7 +66,18 @@ async function fetchForecast() {
   }
 }
 
-const EMPTY = { ok: false, gunduz: null, gece: null, nem: null, ruzgar: null, durum: '—', ikon: 'cloud' };
+const EMPTY = {
+  ok: false,
+  gunduz: null,
+  gece: null,
+  nem: null,
+  ruzgar: null,
+  durum: '—',
+  ikon: 'cloud',
+  gunDogumu: null,
+  gunBatimi: null,
+  gunduzSuresi: null,
+};
 
 // effectiveISO: "YYYY-MM-DD" — o güne ait değerleri döndürür.
 export async function getWeather(effectiveISO) {
@@ -82,6 +96,10 @@ export async function getWeather(effectiveISO) {
     }
   }
   const raw = cache.data;
+  return weatherForDate(raw, effectiveISO);
+}
+
+export function weatherForDate(raw, effectiveISO) {
   if (!raw?.daily?.time) return EMPTY;
 
   const idx = raw.daily.time.indexOf(effectiveISO);
@@ -112,7 +130,23 @@ export async function getWeather(effectiveISO) {
     ruzgar: round(raw.daily.wind_speed_10m_max?.[i]),
     durum,
     ikon,
+    gunDogumu: clockTime(raw.daily.sunrise?.[i]),
+    gunBatimi: clockTime(raw.daily.sunset?.[i]),
+    gunduzSuresi: daylightDuration(raw.daily.daylight_duration?.[i]),
   };
+}
+
+function clockTime(value) {
+  const match = String(value ?? '').match(/T(\d{2}:\d{2})/);
+  return match?.[1] ?? null;
+}
+
+function daylightDuration(seconds) {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return null;
+  const totalMinutes = Math.round(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours} sa ${minutes} dk`;
 }
 
 function round(v) {

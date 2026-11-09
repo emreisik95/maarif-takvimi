@@ -5,7 +5,12 @@
 // GET /health      -> sağlık kontrolü
 import express from 'express';
 import { assembleModel } from './src/model.js';
-import { buildSVG } from './src/render.js';
+import {
+  buildLandscapeSVG,
+  buildSVG,
+  LANDSCAPE_VARIANTS,
+  selectLandscapeVariant,
+} from './src/render.js';
 import { svgToPng } from './src/raster.js';
 import { num } from './src/env.js';
 
@@ -33,6 +38,29 @@ app.get('/image.png', async (_req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).type('text').send('render error: ' + err.message);
+  }
+});
+
+// Seçim önizlemeleri: mevcut portre endpoint'i değiştirmeden doğal 800x600
+// yatay kompozisyonları gösterir.
+app.get('/image-landscape/:variant.png', async (req, res) => {
+  const { variant } = req.params;
+  if (variant !== 'auto' && !LANDSCAPE_VARIANTS.includes(variant)) {
+    return res.status(404).type('text').send('unknown landscape layout');
+  }
+
+  try {
+    const model = await assembleModel();
+    const selectedVariant = variant === 'auto' ? selectLandscapeVariant(model) : variant;
+    const png = svgToPng(buildLandscapeSVG(model, selectedVariant), 800);
+    return res
+      .type('image/png')
+      .set('Cache-Control', 'no-store')
+      .set('X-Maarif-Layout', selectedVariant)
+      .send(png);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).type('text').send('render error: ' + err.message);
   }
 });
 
