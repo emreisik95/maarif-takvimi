@@ -173,71 +173,75 @@ function wrapDurum(s) {
 }
 
 // --- Sol kutu: Google Takvim ---
+// Uzaktan okunurluk: kutular geniş (124px), saat 26px, başlık 16px kalın.
+const BOX_Y = 298, BOX_W = 124, BOX_H = 352;
+const CAL_X = 26, WX_X = W - 26 - BOX_W;
+
 function calendarBox(model) {
-  const bx = 28, by = 298, bw = 104, bh = 352, cx = bx + bw / 2;
+  const bx = CAL_X, by = BOX_Y, bw = BOX_W, bh = BOX_H, cx = bx + bw / 2;
   const p = [rect(bx, by, bw, bh, 2.5)];
   CALENDAR_TITLE.forEach((l, i) => {
-    p.push(txt(cx, by + 26 + i * 21, l, { size: fitSerif(l, bw - 14, 18), weight: 'bold' }));
+    p.push(txt(cx, by + 26 + i * 22, l, { size: fitSerif(l, bw - 14, 20), weight: 'bold' }));
   });
-  p.push(line(bx + 10, by + 59, bx + bw - 10, by + 59, 1.6));
+  p.push(line(bx + 10, by + 60, bx + bw - 10, by + 60, 1.6));
 
   // 19:00 sonrası yarının etkinlikleri gösterilir — etiketle belirt.
   const gunEtiketi = model.rolled ? 'Yarın' : 'Bugün';
-  p.push(txt(cx, by + 80, gunEtiketi, { size: 15, weight: 'bold', style: 'italic' }));
+  p.push(txt(cx, by + 84, gunEtiketi, { size: 18, weight: 'bold', style: 'italic' }));
 
   const evs = model.events || [];
   if (!evs.length) {
-    p.push(txt(cx, by + 165, `${gunEtiketi} için`, { size: 16 }));
-    p.push(txt(cx, by + 187, 'etkinlik yok', { size: 16 }));
+    p.push(txt(cx, by + 180, 'Etkinlik', { size: 22, weight: 'bold' }));
+    p.push(txt(cx, by + 208, 'yok', { size: 22, weight: 'bold' }));
   } else {
-    // Saat 18px bold + başlık 2 satıra kadar 12px — 10 karakterlik kırpma yerine
-    // ~30 karakter okunur başlık.
-    const shown = evs.slice(0, 4);
-    const block = shown.length <= 3 ? 78 : 62;
+    // En fazla 3 etkinlik: saat 26px + başlık 2 satıra kadar 16px.
+    const shown = evs.slice(0, 3);
+    const extra = evs.length - shown.length;
     shown.forEach((e, i) => {
-      const y = by + 106 + i * block;
-      p.push(txt(cx, y, e.time, { size: 18, weight: 'bold' }));
-      const lines = wrapTitle(displayTitle(e.title), 15);
-      lines.forEach((l, j) => {
-        p.push(txt(cx, y + 16 + j * 14, l, { size: 12 }));
+      const y = by + 118 + i * 80;
+      p.push(txt(cx, y, e.time, { size: e.time.length > 5 ? 22 : 26, weight: 'bold' }));
+      wrapTitle(displayTitle(e.title), 13).forEach((l, j) => {
+        p.push(txt(cx, y + 21 + j * 19, l, { size: fitSerif(l, bw - 10, 16), weight: 'bold' }));
       });
     });
+    if (extra > 0) p.push(txt(cx, by + bh - 10, `+${extra} daha`, { size: 15, style: 'italic', weight: 'bold' }));
   }
   return p.join('');
 }
 
 // --- Sağ kutu: Hava durumu ---
+// Uzaktan okunurluk: gündüz sıcaklığı dev Bebas rakam, diğerleri ≥18px kalın.
 function weatherBox(model) {
-  const bx = 468, by = 298, bw = 104, bh = 352, cx = bx + bw / 2;
+  const bx = WX_X, by = BOX_Y, bw = BOX_W, bh = BOX_H, cx = bx + bw / 2;
   const w = model.weather;
   const p = [rect(bx, by, bw, bh, 2.5)];
-  WEATHER_LABEL.forEach((l, i) => {
-    p.push(txt(cx, by + 24 + i * 21, l, { size: fitSerif(l, bw - 14, 18), weight: 'bold' }));
+  const labels = WEATHER_LABEL.slice(0, 2);
+  labels.forEach((l, i) => {
+    p.push(txt(cx, by + 26 + i * 22, l, { size: fitSerif(l, bw - 14, 20), weight: 'bold' }));
   });
+  p.push(line(bx + 10, by + 60, bx + bw - 10, by + 60, 1.6));
 
-  p.push(weatherIcon(w.ikon, cx, by + 112));
+  p.push(weatherIcon(w.ikon, cx, by + 96));
 
   const dl = wrapDurum(w.durum);
   if (dl.length === 1) {
-    p.push(txt(cx, by + 162, dl[0], { size: 18, weight: 'bold' }));
+    p.push(txt(cx, by + 150, dl[0], { size: fitSerif(dl[0], bw - 12, 20), weight: 'bold' }));
   } else {
-    p.push(txt(cx, by + 152, dl[0], { size: 15, weight: 'bold' }));
-    p.push(txt(cx, by + 172, dl[1], { size: 15, weight: 'bold' }));
+    p.push(txt(cx, by + 142, dl[0], { size: fitSerif(dl[0], bw - 12, 17), weight: 'bold' }));
+    p.push(txt(cx, by + 161, dl[1], { size: fitSerif(dl[1], bw - 12, 17), weight: 'bold' }));
   }
 
-  // Kutu içinde kal: uzun değerlerde (örn. "Gündüz -12°") font otomatik küçülür.
-  const innerW = bw - 10;
-  const gunduzS = `Gündüz ${w.gunduz == null ? '—' : `${w.gunduz}°`}`;
+  // Gündüz sıcaklığı: dev rakam (uzaktan bir bakışta)
+  const gunduz = w.gunduz == null ? '—' : `${w.gunduz}°`;
+  p.push(txt(cx, by + 238, gunduz, { family: DISPLAY, size: fitSize(gunduz, bw - 12, 76) }));
   const geceS = `Gece ${w.gece == null ? '—' : `${w.gece}°`}`;
-  p.push(txt(cx, by + 198, gunduzS, { size: fitSerif(gunduzS, innerW, 15), weight: 'bold' }));
-  p.push(txt(cx, by + 220, geceS, { size: fitSerif(geceS, innerW, 15), weight: 'bold' }));
-  p.push(line(bx + 12, by + 238, bx + bw - 12, by + 238, 1.3));
+  p.push(txt(cx, by + 266, geceS, { size: fitSerif(geceS, bw - 12, 20), weight: 'bold' }));
+  p.push(line(bx + 12, by + 282, bx + bw - 12, by + 282, 1.3));
 
   const nem = w.nem == null ? '—' : `%${w.nem}`;
-  p.push(txt(cx, by + 262, `Nem ${nem}`, { size: 17 }));
-  p.push(txt(cx, by + 286, 'Rüzgar', { size: 16 }));
-  const ruz = w.ruzgar == null ? '—' : `${w.ruzgar} km/s`;
-  p.push(txt(cx, by + 306, ruz, { size: 16 }));
+  p.push(txt(cx, by + 308, `Nem ${nem}`, { size: 18, weight: 'bold' }));
+  const ruz = w.ruzgar == null ? 'Rüzgar —' : `Rüzgar ${w.ruzgar}`;
+  p.push(txt(cx, by + 334, ruz, { size: fitSerif(ruz, bw - 12, 18), weight: 'bold' }));
   return p.join('');
 }
 
@@ -287,13 +291,13 @@ export function buildSVG(model) {
 
   // --- Dev gün numarası (doğal genişlik; kutular arasına sığar, gerilmez) ---
   const dd = String(model.effective.day).padStart(2, '0');
-  s.push(txt(W / 2, 606, dd, { family: DISPLAY, size: 380 }));
+  s.push(txt(W / 2, 600, dd, { family: DISPLAY, size: 350 }));
 
   // --- Gün adı (uzun adlar için font boyutu küçülür, glif bozulmaz) ---
   // Ç/Ş çengelleri baseline'ın ~0.2em altına iner; çizgiyle çakışmasın diye
   // baseline 700, bölücü 730.
   s.push(txt(W / 2, 700, model.weekdayName,
-    { family: DISPLAY, size: fitSize(model.weekdayName, 336, 86) }));
+    { family: DISPLAY, size: fitSize(model.weekdayName, 290, 86) }));
 
   s.push(line(30, 730, 570, 730, 4));
 
@@ -301,10 +305,10 @@ export function buildSVG(model) {
   // Alt bandın (bölücü 730 — iç çerçeve 780) dikey ortasına hizalanır.
   // Mürekkep merkezi ≈ baseline - 0.245*size (cap ~0.7, descender ~0.21).
   const q = model.quote || '';
-  const zoneMid = (730 + 780) / 2;
-  if (q.length <= 55) {
-    const base = q.length <= 30 ? 24 : q.length <= 45 ? 20 : 17;
-    const size = fitSerif(q, 508, base);
+  const zoneMid = 751; // alt bant ortası, sağ alttaki form no ile çakışmasın diye hafif yukarı
+  const oneLine = fitSerif(q, 480, 26);
+  if (oneLine >= 19) {
+    const size = oneLine;
     s.push(txt(W / 2, Math.round(zoneMid + 0.245 * size), q, { size, weight: 'bold' }));
   } else {
     const mid = Math.floor(q.length / 2);
@@ -315,8 +319,8 @@ export function buildSVG(model) {
     }
     const l1 = idx > 0 ? q.slice(0, idx) : q;
     const l2 = idx > 0 ? q.slice(idx + 1) : '';
-    const size = Math.min(16, fitSerif(l1, 500, 16), fitSerif(l2, 430, 16));
-    const gap = 20;
+    const size = Math.min(19, fitSerif(l1, 520, 19), fitSerif(l2, 450, 19));
+    const gap = 22;
     const y1 = Math.round(zoneMid - gap / 2 + 0.245 * size); // iki satırın mürekkep merkezi zoneMid
     s.push(txt(W / 2, y1, l1, { size, weight: 'bold' }));
     if (l2) s.push(txt(W / 2, y1 + gap, l2, { size, weight: 'bold' }));
