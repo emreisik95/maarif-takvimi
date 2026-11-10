@@ -4,46 +4,11 @@
       "name": "Maarif",
       "priority": -950,
       "items": [
-        {
-          "name": "Kur ve başlat",
-          "action": "bin/install.sh",
-          "exitmenu": false,
-          "refresh": true,
-          "status": false,
-          "internal": "status Maarif otomatik başlatma kuruldu"
-        },
-        {
-          "name": "Şimdi güncelle",
-          "action": "bin/refresh.sh",
-          "exitmenu": false,
-          "refresh": true,
-          "status": false,
-          "internal": "status Maarif ekranı güncellendi"
-        },
-        {
-          "name": "Durdur",
-          "action": "bin/stop.sh",
-          "exitmenu": false,
-          "refresh": true,
-          "status": false,
-          "internal": "status Maarif zamanlayıcı durduruldu"
-        },
-        {
-          "name": "Durum yaz",
-          "action": "bin/status.sh",
-          "exitmenu": false,
-          "refresh": false,
-          "status": false,
-          "internal": "status maarif-status.log yazıldı"
-        },
-        {
-          "name": "Otomatik başlatmayı kaldır",
-          "action": "bin/uninstall.sh",
-          "exitmenu": false,
-          "refresh": true,
-          "status": false,
-          "internal": "status Maarif otomatik başlatma kaldırıldı"
-        }
+        { "name": "Kur ve başlat", "action": "bin/install.sh", "exitmenu": false, "refresh": true, "status": false, "internal": "status Maarif kuruldu ve başlatıldı" },
+        { "name": "Şimdi güncelle", "action": "bin/refresh.sh", "exitmenu": false, "refresh": true, "status": false, "internal": "status Maarif güncellendi" },
+        { "name": "Durum yaz", "action": "bin/status.sh", "exitmenu": false, "refresh": false, "status": false, "internal": "status maarif-status.txt yazıldı" },
+        { "name": "Durdur", "action": "bin/stop.sh", "exitmenu": false, "refresh": true, "status": false, "internal": "status Maarif durduruldu" },
+        { "name": "Otomatik başlatmayı kaldır", "action": "bin/uninstall.sh", "exitmenu": false, "refresh": true, "status": false, "internal": "status Otomatik başlatma kaldırıldı" }
       ]
     }
   ]

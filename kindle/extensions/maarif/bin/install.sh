@@ -1,22 +1,17 @@
 #!/bin/sh
+# KUAL "Kur ve başlat": upstart işini kurar (yeniden başlatmada da çalışır),
+# eski sürümleri temizler ve zamanlayıcıyı başlatır.
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 MAARIF_BASE="${MAARIF_BASE:-$(dirname "$SCRIPT_DIR")}"
 . "$SCRIPT_DIR/config.sh"
 . "$SCRIPT_DIR/lib.sh"
+LOG_TAG=install
 
-UPSTART_JOB="${MAARIF_UPSTART_JOB:-/etc/upstart/maarif.conf}"
-MNTROOT_BIN="${MNTROOT_BIN:-mntroot}"
-START_BIN="${START_BIN:-start}"
-STOP_BIN="${STOP_BIN:-stop}"
-LEGACY_JOB_1="${MAARIF_LEGACY_JOB_1:-/etc/upstart/onlinescreensaver.conf}"
-LEGACY_JOB_2="${MAARIF_LEGACY_JOB_2:-/etc/upstart/maarif-dashboard.conf}"
 ROOT_RW=0
-JOB_TMP="${UPSTART_JOB}.tmp.$$"
-
 remount_ro() {
-  rm -f "$JOB_TMP" 2>/dev/null || true
+  rm -f "$UPSTART_JOB.tmp.$$" 2>/dev/null
   if [ "$ROOT_RW" -eq 1 ]; then
     "$MNTROOT_BIN" ro >/dev/null 2>&1 || true
     ROOT_RW=0
@@ -25,88 +20,40 @@ remount_ro() {
 trap 'remount_ro' 0
 trap 'exit 1' HUP INT TERM
 
-rollback_installed_job() {
-  if "$MNTROOT_BIN" rw >/dev/null 2>&1; then
-    ROOT_RW=1
-    rm -f "$UPSTART_JOB" || true
-    "$SYNC_BIN" >/dev/null 2>&1 || true
-    remount_ro
-  else
-    log_message "could not remount root to roll back failed service"
-  fi
-}
+fail() { log_message "KURULUM BAŞARISIZ: $*"; exit 1; }
 
-stop_legacy_schedulers() {
-  "$STOP_BIN" onlinescreensaver >/dev/null 2>&1 || true
-  "$STOP_BIN" maarif-dashboard >/dev/null 2>&1 || true
-  for LEGACY_PATTERN in 'onlinescreensaver/bin/scheduler.sh' 'maarif-dashboard/bin/loop.sh'; do
-    LEGACY_PIDS=$(ps xa 2>/dev/null | grep "$LEGACY_PATTERN" | grep -v grep | "$AWK_BIN" '{print $1}')
-    for LEGACY_PID in $LEGACY_PIDS; do
-      [ "$LEGACY_PID" = "$$" ] || kill "$LEGACY_PID" >/dev/null 2>&1 || true
-    done
+log_message "kurulum başlıyor"
+
+# 1) Eski zamanlayıcıları durdur (aynı adlı eski 'maarif' işi dahil).
+"$STOP_BIN" maarif >/dev/null 2>&1 || true
+for JOB in onlinescreensaver maarif-dashboard; do "$STOP_BIN" "$JOB" >/dev/null 2>&1 || true; done
+for PATTERN in 'maarif/bin/daemon.sh' 'maarif/bin/maarifd.sh' 'onlinescreensaver/bin/scheduler.sh' 'maarif-dashboard/bin/loop.sh'; do
+  for PID in $(ps 2>/dev/null | grep "$PATTERN" | grep -v grep | "$AWK_BIN" '{print $1}'); do
+    [ "$PID" = "$$" ] || kill "$PID" >/dev/null 2>&1 || true
   done
-  rm -f /tmp/maarif-dashboard.pid
-  "$LIPC_SET_BIN" com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
-  "$LIPC_SET_BIN" com.lab126.powerd stopSuspend 0 >/dev/null 2>&1 || true
-}
+done
+rm -rf "${MAARIF_LEGACY_TMP:-/tmp}/maarif.lock" "${MAARIF_LEGACY_TMP:-/tmp}/maarif-dashboard.pid" "$RUN_DIR"
+"$LIPC_SET_BIN" com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
 
-remove_legacy_upstart_jobs() {
-  [ -e "$LEGACY_JOB_1" ] || [ -e "$LEGACY_JOB_2" ] || return 0
-  if ! "$MNTROOT_BIN" rw >/dev/null 2>&1; then
-    return 1
-  fi
-  ROOT_RW=1
-  rm -f "$LEGACY_JOB_1" "$LEGACY_JOB_2" || {
-    remount_ro
-    return 1
-  }
-  "$SYNC_BIN" >/dev/null 2>&1 || true
-  remount_ro
-}
-
-mkdir -p "$STATE_DIR" || exit 1
-ensure_verified_last_good || {
-  log_message "packaged fallback is invalid; refusing to install"
-  exit 1
-}
-
-UPSTART_DIR=${UPSTART_JOB%/*}
-if [ ! -d "$UPSTART_DIR" ]; then
-  log_message "upstart directory is missing: $UPSTART_DIR"
-  exit 1
-fi
-
-if ! "$MNTROOT_BIN" rw >/dev/null 2>&1; then
-  log_message "could not remount Kindle root read-write"
-  exit 1
-fi
+# 2) Upstart işini kur, eskileri kaldır.
+[ -d "${UPSTART_JOB%/*}" ] || fail "upstart klasörü yok: ${UPSTART_JOB%/*}"
+"$MNTROOT_BIN" rw >/dev/null 2>&1 || fail "kök dosya sistemi yazılabilir yapılamadı"
 ROOT_RW=1
-
-rm -f "$JOB_TMP"
-if ! cp "$SCRIPT_DIR/maarif.conf" "$JOB_TMP"; then
-  log_message "could not stage upstart job"
-  exit 1
-fi
-chmod 644 "$JOB_TMP" || exit 1
-if ! mv "$JOB_TMP" "$UPSTART_JOB"; then
-  log_message "could not install upstart job"
-  exit 1
-fi
+cp "$SCRIPT_DIR/maarif.conf" "$UPSTART_JOB.tmp.$$" || fail "upstart işi kopyalanamadı"
+chmod 644 "$UPSTART_JOB.tmp.$$"
+mv "$UPSTART_JOB.tmp.$$" "$UPSTART_JOB" || fail "upstart işi yazılamadı"
+rm -f "${UPSTART_JOB%/*}/onlinescreensaver.conf" "${UPSTART_JOB%/*}/maarif-dashboard.conf"
 "$SYNC_BIN" >/dev/null 2>&1 || true
 remount_ro
-touch "$ENABLED_FILE" || exit 1
 
-"$STOP_BIN" maarif >/dev/null 2>&1 || true
+# 3) Ekranda okunur bir takvim olduğundan emin ol, sonra başlat.
+mkdir -p "$STATE_DIR"
+rm -f "$STATE_DIR/fails" "$STATE_DIR/next_due"
+ensure_target_has_content || log_message "UYARI: ekrana yedek görsel konamadı"
+touch "$ENABLED_FILE" || fail "enabled dosyası yazılamadı"
 if ! "$START_BIN" maarif >/dev/null 2>&1; then
   rm -f "$ENABLED_FILE"
-  rollback_installed_job
-  log_message "upstart job installed but could not be started"
-  exit 1
+  fail "upstart işi başlatılamadı"
 fi
-if ! remove_legacy_upstart_jobs; then
-  log_message "new service started but legacy upstart cleanup failed"
-  exit 1
-fi
-stop_legacy_schedulers
-log_message "installed and started reboot-persistent Maarif service"
+log_message "kuruldu ve başlatıldı"
 exit 0

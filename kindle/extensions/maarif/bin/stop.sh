@@ -1,21 +1,17 @@
 #!/bin/sh
+# KUAL "Durdur": zamanlayıcıyı durdurur (otomatik başlatma kurulu kalır ama
+# 'enabled' silindiği için yeniden başlatmada da çalışmaz).
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 MAARIF_BASE="${MAARIF_BASE:-$(dirname "$SCRIPT_DIR")}"
 . "$SCRIPT_DIR/config.sh"
 . "$SCRIPT_DIR/lib.sh"
-
-STOP_BIN="${STOP_BIN:-stop}"
-LOCK_DIR="${MAARIF_LOCK_DIR:-/tmp/maarif.lock}"
-PID_FILE="$LOCK_DIR/pid"
+LOG_TAG=stop
 
 rm -f "$ENABLED_FILE"
 "$STOP_BIN" maarif >/dev/null 2>&1 || true
-
-PID=$(cat "$PID_FILE" 2>/dev/null || true)
-if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-  kill "$PID" >/dev/null 2>&1 || true
-fi
-log_message "service stopped"
-
+PID=$(cat "$RUN_DIR/maarifd.pid" 2>/dev/null || true)
+[ -n "$PID" ] && kill "$PID" >/dev/null 2>&1
+log_message "durduruldu"
+exit 0

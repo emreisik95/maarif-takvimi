@@ -52,6 +52,12 @@ app.get('/image-landscape/:variant.png', async (req, res) => {
   try {
     const model = await assembleModel();
     const selectedVariant = variant === 'auto' ? selectLandscapeVariant(model) : variant;
+    if (req.query.src === 'kindle') {
+      // Kindle her yenilemede ?src=kindle&bat=NN ekler: cihazın son görülme
+      // zamanı ve pili sunucu loglarından takip edilir.
+      const bat = String(req.query.bat ?? 'na').replace(/[^0-9a-z]/gi, '').slice(0, 4);
+      console.log(`[kindle] ${new Date().toISOString()} layout=${selectedVariant} bat=${bat}`);
+    }
     const png = svgToPng(buildLandscapeSVG(model, selectedVariant), 800);
     return res
       .type('image/png')

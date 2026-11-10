@@ -1,127 +1,131 @@
 #!/bin/sh
+# Tek yenileme: görseli indir, panele uydur, ekrana koy.
+#   refresh.sh auto    -> WHITE_HOUR içindeyse beyaz, değilse takvim (zamanlayıcı)
+#   refresh.sh normal  -> her zaman takvim (KUAL "Şimdi güncelle")
+#   refresh.sh white   -> beyaz ekran
+# Çıkış: 0 = takvim güncellendi, 3 = beyaz kondu, 1 = başarısız, 75 = başka
+# yenileme sürüyor.
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 MAARIF_BASE="${MAARIF_BASE:-$(dirname "$SCRIPT_DIR")}"
 . "$SCRIPT_DIR/config.sh"
 . "$SCRIPT_DIR/lib.sh"
+LOG_TAG=refresh
 
-mkdir -p "$STATE_DIR" || exit 1
-DOWNLOAD_TMP="$STATE_DIR/download.$$.png"
-NORMALIZED_TMP="$STATE_DIR/normalized.$$.png"
-LAST_GOOD_TMP="${LAST_GOOD_IMAGE}.tmp.$$"
-TARGET_TMP="${TARGET_IMAGE}.tmp.$$"
+MODE=${1:-normal}
+LOCK_DIR="$RUN_DIR/refresh.lock"
+DOWNLOAD_TMP="$RUN_DIR/download.$$.png"
+NORMALIZED_TMP="$RUN_DIR/normalized.$$.png"
+LOCKED=0
 WIFI_WAS_OFF=0
-AUTO_MODE=0
 
-cleanup_refresh() {
-  rm -f "$DOWNLOAD_TMP" "$NORMALIZED_TMP" "$LAST_GOOD_TMP" "$TARGET_TMP"
+cleanup() {
+  rm -f "$DOWNLOAD_TMP" "$NORMALIZED_TMP"
   if [ "$WIFI_WAS_OFF" -eq 1 ]; then
     "$LIPC_SET_BIN" com.lab126.cmd wirelessEnable 0 >/dev/null 2>&1 || true
-    WIFI_WAS_OFF=0
   fi
+  [ "$LOCKED" -eq 1 ] && rm -rf "$LOCK_DIR"
 }
-trap 'cleanup_refresh' 0
+trap 'cleanup' 0
 trap 'exit 1' HUP INT TERM
 
-requested_mode=${1:-auto}
-if [ "$requested_mode" = auto ]; then
-  AUTO_MODE=1
-  requested_mode=$(current_mode) || exit 1
-fi
-
-install_white_if_auto_window() {
-  [ "$AUTO_MODE" -eq 1 ] || return 1
-  [ "$(current_mode)" = white ] || return 1
-  validate_panel_image "$WHITE_IMAGE" || return 1
-  install_display_image "$WHITE_IMAGE" "03:00 white window"
+fail() {
+  log_message "BAŞARISIZ: $*"
+  state_set last_error "$("$DATE_BIN" '+%Y-%m-%d %H:%M:%S') $*"
+  exit 1
 }
 
-if [ "$requested_mode" = white ]; then
-  validate_panel_image "$WHITE_IMAGE" || {
-    log_message "packaged white image is invalid"
-    exit 1
-  }
-  install_display_image "$WHITE_IMAGE" "03:00 white window"
-  exit $?
+mkdir -p "$RUN_DIR" "$STATE_DIR" || exit 1
+
+# Aynı anda tek yenileme. Sahibi ölmüşse kilidi devral.
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+  if [ -n "$OWNER" ] && kill -0 "$OWNER" 2>/dev/null; then
+    log_message "başka yenileme sürüyor (pid $OWNER); atlandı"
+    exit 75
+  fi
+  rm -rf "$LOCK_DIR"
+  mkdir "$LOCK_DIR" 2>/dev/null || exit 75
+fi
+LOCKED=1
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+
+userstore_available || { log_message "USB depolama modu; yenileme atlandı"; exit 1; }
+
+if [ "$MODE" = auto ]; then
+  if [ -n "$WHITE_HOUR" ] && [ "$(current_hour)" = "$WHITE_HOUR" ]; then MODE=white; else MODE=normal; fi
 fi
 
-if [ "$requested_mode" != normal ]; then
-  log_message "invalid refresh mode: $requested_mode"
-  exit 2
-fi
+case "$MODE" in
+  white)
+    validate_panel_image "$WHITE_IMAGE" || fail "paketteki beyaz görsel bozuk"
+    install_display_image "$WHITE_IMAGE" || fail "beyaz görsel konamadı"
+    log_message "beyaz ekran penceresi"
+    exit 3
+    ;;
+  normal) ;;
+  *) log_message "bilinmeyen kip: $MODE"; exit 2 ;;
+esac
 
-# Restore a non-blank image before networking. This makes 04:00 end the white
-# window immediately and also repairs a missing or invalid linkss target.
-if ! validate_normal_image "$TARGET_IMAGE"; then
-  restore_last_good || {
-    log_message "no verified offline image available"
-    exit 1
-  }
-fi
+# Ağdan önce ekranda mutlaka okunur bir takvim olsun (04:00'te beyazı hemen
+# kaldırır, bozuk/eksik hedefi onarır).
+ensure_target_has_content || log_message "UYARI: ekrana yedek görsel de konamadı"
 
-# Keep the offline copy healthy even when the currently installed target came
-# from an older extension version.
-ensure_verified_last_good || log_message "could not seed last-good"
-
-WIRELESS_STATE=$("$LIPC_GET_BIN" com.lab126.cmd wirelessEnable 2>/dev/null || printf '1')
-if [ "$WIRELESS_STATE" = 0 ]; then
+# --- Wi-Fi -------------------------------------------------------------------
+if [ "$("$LIPC_GET_BIN" com.lab126.cmd wirelessEnable 2>/dev/null)" = 0 ]; then
   WIFI_WAS_OFF=1
-  log_message "Wi-Fi was off; enabling temporarily"
 fi
 "$LIPC_SET_BIN" com.lab126.cmd wirelessEnable 1 >/dev/null 2>&1 || true
-log_message "Wi-Fi wake requested; waiting for connection"
-wait_for_wifi_connection
-if install_white_if_auto_window; then
-  exit 0
-fi
+
+WAITED=0
+WIFI_STATE=
+while [ "$WAITED" -lt "$WIFI_TIMEOUT" ]; do
+  WIFI_STATE=$("$LIPC_GET_BIN" com.lab126.wifid cmState 2>/dev/null || true)
+  case "$WIFI_STATE" in CONNECTED*) break ;; esac
+  "$SLEEP_BIN" 3
+  WAITED=$((WAITED + 3))
+done
+case "$WIFI_STATE" in
+  CONNECTED*) log_message "Wi-Fi bağlı (${WAITED}s)" ;;
+  *) log_message "Wi-Fi ${WIFI_TIMEOUT}s içinde bağlanmadı (durum: ${WIFI_STATE:-bilinmiyor}); yine de deneniyor" ;;
+esac
+
+# --- İndir -------------------------------------------------------------------
+# Sunucu loglarında cihazı görebilmek için kaynak ve pil bilgisi eklenir.
+case "$IMAGE_URL" in *\?*) SEP='&' ;; *) SEP='?' ;; esac
+URL="${IMAGE_URL}${SEP}src=kindle&bat=$(battery_level)"
 
 ATTEMPT=1
-DOWNLOADED=0
-while [ "$ATTEMPT" -le "$DOWNLOAD_ATTEMPTS" ]; do
-  if install_white_if_auto_window; then
-    exit 0
-  fi
+while :; do
   rm -f "$DOWNLOAD_TMP"
-  log_message "download attempt $ATTEMPT/$DOWNLOAD_ATTEMPTS"
-  if "$CURL_BIN" -f -L --cacert "$CA_CERT" \
-    --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" \
-    -o "$DOWNLOAD_TMP" "$IMAGE_URL" && validate_png_signature "$DOWNLOAD_TMP"; then
-    DOWNLOADED=1
+  if "$CURL_BIN" -f -s -S -L --cacert "$CA_CERT" \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" \
+      -o "$DOWNLOAD_TMP" "$URL" 2>"$RUN_DIR/curl.err" \
+     && validate_png_signature "$DOWNLOAD_TMP"; then
     break
   fi
+  log_message "indirme denemesi $ATTEMPT/$DOWNLOAD_ATTEMPTS başarısız: $(head -c 200 "$RUN_DIR/curl.err" 2>/dev/null | tr '\n' ' ')"
+  [ "$ATTEMPT" -ge "$DOWNLOAD_ATTEMPTS" ] && fail "indirme ($DOWNLOAD_ATTEMPTS deneme)"
   ATTEMPT=$((ATTEMPT + 1))
-  [ "$ATTEMPT" -le "$DOWNLOAD_ATTEMPTS" ] && "$SLEEP_BIN" "$DOWNLOAD_RETRY_DELAY"
+  "$SLEEP_BIN" "$DOWNLOAD_RETRY_DELAY"
 done
 
-if [ "$DOWNLOADED" -ne 1 ]; then
-  if install_white_if_auto_window; then
-    exit 0
-  fi
-  log_message "download failed; keeping verified offline image"
-  exit 0
+# --- Panele uydur ve koy ---------------------------------------------------------
+"$CONVERT_BIN" "$DOWNLOAD_TMP" \
+  -background white -rotate "$IMAGE_ROTATION" -resize "${SCREEN_SIZE}!" \
+  -alpha remove -alpha off -colorspace Gray -type Grayscale -depth 8 \
+  -define png:color-type=0 "$NORMALIZED_TMP" >/dev/null 2>&1 || fail "convert"
+validate_panel_image "$NORMALIZED_TMP" content || fail "indirilen görsel geçersiz/boş"
+
+# Ağ beklerken beyaz saate girildiyse takvimi koyma.
+if [ "${1:-normal}" = auto ] && [ -n "$WHITE_HOUR" ] && [ "$(current_hour)" = "$WHITE_HOUR" ]; then
+  install_display_image "$WHITE_IMAGE" && log_message "beyaz ekran penceresi (indirme sonrası)"
+  exit 3
 fi
 
-if ! normalize_image "$DOWNLOAD_TMP" "$NORMALIZED_TMP"; then
-  log_message "downloaded image validation or normalization failed"
-  exit 0
-fi
-
-if install_white_if_auto_window; then
-  exit 0
-fi
-
-TARGET_PARENT=${TARGET_IMAGE%/*}
-mkdir -p "$TARGET_PARENT" "$STATE_DIR" || exit 1
-cp "$NORMALIZED_TMP" "$LAST_GOOD_TMP" || exit 1
-cp "$NORMALIZED_TMP" "$TARGET_TMP" || exit 1
-"$SYNC_BIN" >/dev/null 2>&1 || true
-if install_white_if_auto_window; then
-  exit 0
-fi
-mv "$LAST_GOOD_TMP" "$LAST_GOOD_IMAGE" || exit 1
-mv "$TARGET_TMP" "$TARGET_IMAGE" || exit 1
-"$SYNC_BIN" >/dev/null 2>&1 || true
-log_message "fresh image committed to target and last-good"
-refresh_screen_if_asleep
+copy_atomic "$NORMALIZED_TMP" "$LAST_GOOD_IMAGE" || fail "son iyi görsel yazılamadı"
+install_display_image "$NORMALIZED_TMP" || fail "görsel ekrana konamadı"
+state_set last_ok "$("$DATE_BIN" '+%Y-%m-%d %H:%M:%S')"
+log_message "takvim güncellendi (pil %$(battery_level))"
 exit 0
