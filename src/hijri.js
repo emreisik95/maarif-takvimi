@@ -39,3 +39,32 @@ export function getHizirKasim({ year, month, day }) {
   const baslangic = Date.UTC(baslangicYili, 10, 8);
   return { tur: 'Kasım', gun: Math.floor((cur - baslangic) / DAY) + 1 };
 }
+
+// Rumi (Mali) takvim: Jülyen takvimi, yıl 1 Mart'ta başlar, yıl = Jülyen - 584.
+export const RUMI_AYLAR = [
+  'Kânunusani', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Teşrinievvel', 'Teşrinisani', 'Kânunuevvel',
+];
+
+// Gregoryen -> Jülyen (JDN üzerinden) -> Rumi {gun, ay, ayAdi, yil}
+export function getRumi({ year, month, day }) {
+  const a = Math.floor((14 - month) / 12);
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  const jdn = day + Math.floor((153 * m + 2) / 5) + 365 * y
+    + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+  // JDN -> Jülyen takvimi
+  const c = jdn + 32082;
+  const d = Math.floor((4 * c + 3) / 1461);
+  const e = c - Math.floor((1461 * d) / 4);
+  const mm = Math.floor((5 * e + 2) / 153);
+  const jDay = e - Math.floor((153 * mm + 2) / 5) + 1;
+  const jMonth = mm + 3 - 12 * Math.floor(mm / 10);
+  const jYear = d - 4800 + Math.floor(mm / 10);
+  return {
+    gun: jDay,
+    ay: jMonth,
+    ayAdi: RUMI_AYLAR[jMonth - 1],
+    yil: jMonth >= 3 ? jYear - 584 : jYear - 585,
+  };
+}

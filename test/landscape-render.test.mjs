@@ -2,98 +2,98 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as render from '../src/render.js';
 import { svgToPng } from '../src/raster.js';
+import { getRumi } from '../src/hijri.js';
+import { getQuoteOfDay } from '../src/quotes.js';
+import { getMenu } from '../src/menu.js';
+import { cleanWiki, parseEvent, pickEvent } from '../src/onthisday.js';
 
 const model = {
-  effective: { year: 2026, month: 7, day: 14 },
+  effective: { year: 2026, month: 11, day: 10 },
   weekdayName: 'SALI',
-  monthName: 'TEMMUZ',
-  dayOfYear: 195,
-  hicri: { yil: 1448, ayAdi: 'Muharrem', gun: 29 },
-  hizir: { tur: 'Hızır', gun: 70 },
-  quote: 'Vakit nakittir.',
+  monthName: 'KASIM',
+  dayOfYear: 314,
+  hicri: { yil: 1448, ayAdi: 'Cemaziyelevvel', gun: 30 },
+  rumi: { yil: 1442, ayAdi: 'Teşrinievvel', gun: 28 },
+  hizir: { tur: 'Kasım', gun: 3 },
+  quote: 'Dost başa, düşman ayağa bakar.',
+  quoteSource: 'Atasözü',
   names: { girl: 'Defne', boy: 'Kerem' },
+  menu: { corba: 'Tarhana çorbası', ana: 'Kuru fasulye', yaninda: 'Pirinç pilavı', tatli: 'Ayva tatlısı' },
+  history: {
+    special: "10 Kasım Atatürk'ü Anma Günü",
+    event: { year: '1953', text: "Atatürk'ün naaşı Anıtkabir'e nakledildi." },
+  },
   weather: {
-    ok: true, ikon: 'sun', durum: 'Açık', gunduz: 32, gece: 20, nem: 42, ruzgar: 17,
-    gunDogumu: '05:52', gunBatimi: '20:24', gunduzSuresi: '14 sa 32 dk',
+    ok: true, ikon: 'sun', durum: 'Açık', gunduz: 18, gece: 9, nem: 60, ruzgar: 12,
+    gunDogumu: '07:40', gunBatimi: '18:00', gunduzSuresi: '10 sa 20 dk',
   },
   events: [
     { time: '09:00', title: 'Proje değerlendirme toplantısı' },
     { time: '12:30', title: 'Öğle yemeği' },
-    { time: '16:00', title: 'Tasarım sunumu' },
-    { time: '19:30', title: 'Akşam yürüyüşü' },
   ],
   now: { hour: 10, minute: 8, second: 0 },
   rolled: false,
 };
 
-test('landscape renderer exposes three selectable 800x600 compositions', () => {
-  assert.deepEqual(render.LANDSCAPE_VARIANTS, ['balanced', 'date-focus', 'agenda-focus']);
-  assert.equal(typeof render.buildLandscapeSVG, 'function');
-
+test('yatay maarif yaprağı tüm bölümleri tek sayfada gösterir', () => {
   for (const variant of render.LANDSCAPE_VARIANTS) {
     const svg = render.buildLandscapeSVG(model, variant);
-    assert.match(svg, /<svg[^>]*width="800"[^>]*height="600"[^>]*viewBox="0 0 800 600"/);
-    assert.match(svg, />TEMMUZ</);
-    assert.match(svg, />14</);
-    assert.match(svg, />SALI</);
-    if (variant === 'date-focus') {
-      assert.doesNotMatch(svg, /AJANDASI|Proje değerlendirme/);
-    } else {
-      assert.match(svg, /Proje değerlendirme/);
+    assert.match(svg, /<svg[^>]*width="800"[^>]*height="600"/);
+    for (const text of ['KASIM', '>10<', 'SALI', 'Rumi 28 Teşrinievvel 1442', 'Hicri 30 Cemaziyelevvel 1448',
+      'TARİHTE BUGÜN', "Atatürk'ü Anma Günü", 'GÜNÜN MENÜSÜ', 'Kuru fasulye', 'Defne · Kerem',
+      'Gün doğumu', '07:40', 'Dost başa, düşman ayağa bakar.', '— Atasözü', 'Açık']) {
+      assert.ok(svg.includes(text.replace(/'/g, '&#39;')) || svg.includes(text), `${variant}: ${text}`);
     }
-    assert.match(svg, />Açık</);
-    if (variant === 'date-focus') {
-      assert.match(svg, /data-section="solar"/);
-      assert.doesNotMatch(svg, />Vakit nakittir\.</);
-      assert.match(svg, />Muğla · Ortaköy</);
-      assert.doesNotMatch(svg, /Muğla · Ortaköy · Hava/);
-      assert.doesNotMatch(svg, />14 temmuz</);
-      assert.match(svg, />Bugün doğanlara verilecek isimler</);
-      assert.match(svg, />Kız: Defne</);
-      assert.match(svg, />Erkek: Kerem</);
-    } else {
-      assert.match(svg, />Vakit nakittir\.</);
-    }
+    if (variant === 'date-focus') assert.doesNotMatch(svg, /AJANDASI/);
+    else assert.match(svg, /Proje değerlendirme/);
     assert.match(svg, new RegExp(`data-layout="${variant}"`));
   }
 });
 
-test('rasterizer can preserve the landscape canvas at 800x600 grayscale', () => {
-  assert.equal(typeof render.buildLandscapeSVG, 'function');
-  const svg = render.buildLandscapeSVG(model, 'balanced');
-  const png = svgToPng(svg, 800);
+test('veri yoksa bölümler boş kalır ama sayfa çizilir', () => {
+  const svg = render.buildLandscapeSVG({ ...model, history: { event: null, special: null }, menu: null, quoteSource: '' }, 'date-focus');
+  assert.match(svg, /TARİHTE BUGÜN/);
+  assert.doesNotMatch(svg, /— Atasözü/);
+});
 
+test('yatay görsel 800x600 gri PNG olarak basılır', () => {
+  const png = svgToPng(render.buildLandscapeSVG(model, 'agenda-focus'), 800);
   assert.equal(png.readUInt32BE(16), 800);
   assert.equal(png.readUInt32BE(20), 600);
-  assert.equal(png[24], 8);
   assert.equal(png[25], 0);
 });
 
-test('automatic landscape emphasizes the date only when the agenda is empty', () => {
-  assert.equal(typeof render.selectLandscapeVariant, 'function');
+test('ajanda boşsa tarih odaklı düzen seçilir', () => {
+  assert.equal(render.selectLandscapeVariant({ ...model, events: [] }), 'date-focus');
+  assert.equal(render.selectLandscapeVariant(model), 'agenda-focus');
+});
 
-  const emptyModel = { ...model, events: [] };
-  const populatedModel = { ...model, events: [{ time: '09:00', title: 'Toplantı' }] };
+test('Rumi tarih Jülyen takviminden ve 1 Mart yılbaşıyla hesaplanır', () => {
+  assert.deepEqual(getRumi({ year: 2026, month: 11, day: 10 }), { gun: 28, ay: 10, ayAdi: 'Teşrinievvel', yil: 1442 });
+  assert.equal(getRumi({ year: 2026, month: 3, day: 13 }).yil, 1441);
+  assert.deepEqual(getRumi({ year: 2026, month: 3, day: 14 }), { gun: 1, ay: 3, ayAdi: 'Mart', yil: 1442 });
+});
 
-  assert.equal(render.selectLandscapeVariant(emptyModel), 'date-focus');
-  assert.equal(render.selectLandscapeVariant(populatedModel), 'agenda-focus');
-  const emptySvg = render.buildLandscapeSVG(emptyModel, render.selectLandscapeVariant(emptyModel));
-  assert.match(emptySvg, /data-layout="date-focus"/);
-  assert.doesNotMatch(emptySvg, /AJANDASI|Etkinlik yok/);
-  assert.doesNotMatch(emptySvg, /Vakit nakittir\.|F\. 18—2/);
-  assert.match(emptySvg, /Gün doğumu/);
-  assert.match(emptySvg, />05:52</);
-  assert.match(emptySvg, /Gün batımı/);
-  assert.match(emptySvg, />20:24</);
-  assert.match(emptySvg, /Gündüz süresi/);
-  assert.match(emptySvg, />14 sa 32 dk</);
-  assert.match(emptySvg, />TEMMUZ</);
-  assert.match(emptySvg, />Açık</);
-  assert.match(emptySvg, />Bugün doğanlara verilecek isimler</);
-  assert.match(emptySvg, />Kız: Defne</);
-  assert.match(emptySvg, />Erkek: Kerem</);
-  assert.match(
-    render.buildLandscapeSVG(populatedModel, render.selectLandscapeVariant(populatedModel)),
-    /data-layout="agenda-focus"/,
-  );
+test('günün sözü kaynaklı gelir ve yıl içinde tekrar etmez', () => {
+  const q = getQuoteOfDay('2026-11-10');
+  assert.ok(q.text && q.source);
+  const seen = new Set();
+  for (let i = 0; i < 250; i++) seen.add(getQuoteOfDay(new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10)).text);
+  assert.equal(seen.size, 250);
+  assert.deepEqual(getQuoteOfDay('2026-11-10'), q, 'aynı gün aynı söz');
+});
+
+test('menü mevsime uygun ve güne göre sabit', () => {
+  const kis = getMenu({ year: 2026, month: 1, day: 5 });
+  assert.ok(kis.corba && kis.ana && kis.yaninda && kis.tatli);
+  assert.deepEqual(getMenu({ year: 2026, month: 1, day: 5 }), kis);
+  assert.notDeepEqual(getMenu({ year: 2026, month: 1, day: 6 }), kis);
+});
+
+test('Vikipedi satırları düz metne çevrilir ve kısa olay seçilir', () => {
+  const line = cleanWiki("[[1938]] - [[Mustafa Kemal Atatürk|Atatürk]], ''Dolmabahçe''de öldü.<ref>x</ref>");
+  assert.equal(line, '1938 - Atatürk, Dolmabahçede öldü.');
+  assert.deepEqual(parseEvent(line), { year: '1938', text: 'Atatürk, Dolmabahçede öldü.' });
+  const pick = pickEvent([{ year: '1', text: 'Roma kuruldu' }, { year: '2', text: 'Osmanlı donanması' }], 's');
+  assert.equal(pick.year, '2', 'Türkiye ile ilgili olay öncelikli');
 });

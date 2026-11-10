@@ -102,7 +102,7 @@ function clock(cx, cy, r, hour, minute) {
     const a = (n * 30) * Math.PI / 180;
     const rr = r * 0.78;
     p.push(txt(cx + rr * Math.sin(a), cy - rr * Math.cos(a) + 4.5, String(n),
-      { size: 12, family: 'PT Serif', weight: 'bold' }));
+      { size: Math.min(12, Math.round(r * 0.29)), family: 'PT Serif', weight: 'bold' }));
   }
   const ha = ((hour % 12) * 30 + minute * 0.5) * Math.PI / 180;
   p.push(line(cx, cy, cx + r * 0.48 * Math.sin(ha), cy - r * 0.48 * Math.cos(ha), 3.6));
@@ -337,248 +337,207 @@ export function buildSVG(model) {
   return s.join('\n');
 }
 
-// --- 800x600 yatay tasarım seçenekleri ---
-// Bunlar seçim önizlemesidir; buildSVG kullanan canlı portre endpoint değişmez.
+// --- 800x600 yatay maarif yaprağı ---------------------------------------
+// Kindle /image-landscape/auto.png ile bunu çeker (cihazda 90° döndürülür).
+// Tek sayfada: Miladi/Rumi/Hicri tarih, saat, büyük gün, ajanda, hava,
+// gün doğumu/batımı, tarihte bugün + özel gün, günün menüsü, isimler, özlü söz.
 export const LANDSCAPE_VARIANTS = Object.freeze(['balanced', 'date-focus', 'agenda-focus']);
 
 export function selectLandscapeVariant(model) {
   return (model.events || []).length > 0 ? 'agenda-focus' : 'date-focus';
 }
 
+// Kelime sınırından en fazla maxLines satıra sar; taşarsa son satır "…".
+function wrapWords(text, maxChars, maxLines) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const next = cur ? `${cur} ${w}` : w;
+    if (next.length <= maxChars) { cur = next; continue; }
+    if (cur) lines.push(cur);
+    cur = w;
+    if (lines.length === maxLines) { cur = ''; break; }
+  }
+  if (cur && lines.length < maxLines) lines.push(cur);
+  const used = lines.join(' ').split(/\s+/).filter(Boolean).length;
+  if (used < words.length && lines.length) {
+    lines[lines.length - 1] = clip(lines[lines.length - 1], maxChars - 1).replace(/[\s,.;:—-]*…?$/, '') + '…';
+  }
+  return lines;
+}
+
 function landscapeHeader(model) {
   const p = [];
-  p.push(txt(130, 70, `Miladi ${model.effective.year}`, { size: 22, weight: 'bold' }));
-  p.push(txt(130, 98, `Ay ${model.effective.month} · Gün ${model.dayOfYear}`, { size: 20, weight: 'bold' }));
-  p.push(clock(400, 84, 37, model.now.hour, model.now.minute));
-  p.push(txt(670, 70, `Hicri ${model.hicri.yil}`, { size: 22, weight: 'bold' }));
-  const hicri = `${model.hicri.gun} ${model.hicri.ayAdi}`;
-  p.push(txt(670, 98, hicri, { size: fitSerif(hicri, 230, 20), weight: 'bold' }));
-  p.push(line(28, 128, 772, 128, 3));
+  const miladi = `Miladi ${model.effective.year} · Ay ${model.effective.month} · Gün ${model.dayOfYear}`;
+  const rumi = model.rumi ? `Rumi ${model.rumi.gun} ${model.rumi.ayAdi} ${model.rumi.yil}` : '';
+  const hicri = `Hicri ${model.hicri.gun} ${model.hicri.ayAdi} ${model.hicri.yil}`;
+  const hizir = `${model.hizir.tur} ${model.hizir.gun}`;
+  p.push(txt(165, 66, miladi, { size: fitSerif(miladi, 280, 19), weight: 'bold' }));
+  if (rumi) p.push(txt(165, 92, rumi, { size: fitSerif(rumi, 280, 17), weight: 'bold' }));
+  p.push(clock(400, 75, 34, model.now.hour, model.now.minute));
+  p.push(txt(635, 66, hicri, { size: fitSerif(hicri, 280, 19), weight: 'bold' }));
+  p.push(txt(635, 92, hizir, { size: 17, weight: 'bold' }));
+  p.push(line(26, 112, 774, 112, 3));
   return p.join('');
 }
 
-function landscapeCalendarBox(model, x, y, w, h, maxEvents = 4) {
+// Dikey tarih kutusu (ajandalı düzen): ay / dev gün / gün adı.
+function landscapeDateColumn(model, x, y, w, h) {
+  const p = [rect(x, y, w, h, 3)];
+  const cx = x + w / 2;
+  p.push(txt(cx, y + 40, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, w - 30, 42), spacing: 2 }));
+  p.push(line(x + 14, y + 52, x + w - 14, y + 52, 1.5));
+  const day = String(model.effective.day).padStart(2, '0');
+  p.push(txt(cx, y + h - 40, day, { family: DISPLAY, size: Math.min(150, Math.floor((h - 100) / 0.72)) }));
+  p.push(txt(cx, y + h - 9, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, w - 30, 34), spacing: 1 }));
+  return p.join('');
+}
+
+// Yatay tarih kutusu (ajandasız düzen): dev gün solda, ay + gün adı sağda.
+function landscapeDateWide(model, x, y, w, h) {
+  const p = [rect(x, y, w, h, 3)];
+  const day = String(model.effective.day).padStart(2, '0');
+  const leftW = Math.round(w * 0.46);
+  p.push(txt(x + leftW / 2 + 4, y + h - 22, day, {
+    family: DISPLAY, size: Math.min(Math.floor((h - 36) / 0.72), Math.floor((leftW - 10) / 0.86)),
+  }));
+  p.push(line(x + leftW + 6, y + 16, x + leftW + 6, y + h - 16, 1.5));
+  const rx = x + leftW + 6 + (w - leftW - 6) / 2;
+  const rw = w - leftW - 34;
+  p.push(txt(rx, y + 84, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, rw, 72), spacing: 2 }));
+  p.push(txt(rx, y + 160, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, rw, 58), spacing: 1 }));
+  return p.join('');
+}
+
+function landscapeAgenda(model, x, y, w, h) {
   const p = [rect(x, y, w, h, 2.5)];
   const label = model.rolled ? 'YARININ AJANDASI' : 'BUGÜNÜN AJANDASI';
-  p.push(txt(x + w / 2, y + 32, label, {
-    size: fitSerif(label, w - 40, 22), weight: 'bold', spacing: 0.4,
-  }));
-  p.push(line(x + 12, y + 48, x + w - 12, y + 48, 1.5));
+  p.push(txt(x + w / 2, y + 26, label, { size: fitSerif(label, w - 30, 18), weight: 'bold', spacing: 0.4 }));
+  p.push(line(x + 12, y + 38, x + w - 12, y + 38, 1.5));
 
   const all = model.events || [];
-  const events = all.slice(0, maxEvents);
-  if (!events.length) {
-    p.push(txt(x + w / 2, y + h / 2, 'Etkinlik yok', { size: 24, weight: 'bold', style: 'italic' }));
-    return p.join('');
-  }
-
-  const narrow = w < 210;
-  if (!narrow) {
-    // Uzaktan okunurluk: saat 26px, başlık 21px kalın (2. satır 19px).
-    // Saat sütunu 92px; "Tüm Gün" gibi uzun etiketler sütuna sığacak kadar küçülür.
-    const extra = all.length - events.length;
-    const rowH = (h - 58 - (extra > 0 ? 22 : 0)) / events.length;
-    const titleX = x + 108;
-    const titleW = w - 120;
-    events.forEach((event, i) => {
-      const top = y + 54 + i * rowH;
-      const lines = wrapTitle(displayTitle(event.title), Math.floor(titleW / 10.5));
-      const blockH = 21 + (lines.length - 1) * 22;
-      const base = top + (rowH - blockH) / 2 + 17;
-      p.push(`<g aria-label="${esc(`${event.time} ${event.title}`)}">`);
-      p.push(txt(x + 14, base + 2, event.time, {
-        size: event.time.length > 5 ? Math.min(19, fitSerif(event.time, 66, 19)) : 26, weight: 'bold', anchor: 'start',
-      }));
-      lines.forEach((title, j) => {
-        p.push(txt(titleX, base + j * 22, title, {
-          size: fitSerif(title, titleW, j === 0 ? 21 : 19), anchor: 'start', weight: 'bold',
-        }));
-      });
-      if (i < events.length - 1) p.push(line(x + 14, top + rowH, x + w - 14, top + rowH, 0.8));
-      p.push('</g>');
-    });
-    if (extra > 0) {
-      p.push(txt(x + w / 2, y + h - 10, `+${extra} etkinlik daha`, { size: 16, weight: 'bold', style: 'italic' }));
-    }
-    return p.join('');
-  }
-
-  const rowH = (h - 64) / Math.max(maxEvents, events.length);
-  const titleChars = narrow
-    ? Math.max(18, Math.floor((w - 30) / 6.5))
-    : Math.max(16, Math.floor((w - 78) / 6.5));
+  const events = all.slice(0, 3);
+  const extra = all.length - events.length;
+  const rowH = (h - 44 - (extra > 0 ? 18 : 0)) / Math.max(events.length, 1);
+  const titleX = x + 84;
+  const titleW = w - 94;
   events.forEach((event, i) => {
-    const top = y + 65 + i * rowH;
+    const top = y + 42 + i * rowH;
+    const lines = wrapWords(displayTitle(event.title), Math.floor(titleW / 9.6), rowH >= 52 ? 2 : 1);
+    const blockH = 18 + (lines.length - 1) * 20;
+    const base = top + (rowH - blockH) / 2 + 15;
     p.push(`<g aria-label="${esc(`${event.time} ${event.title}`)}">`);
-    p.push(txt(x + 17, top + (narrow ? 15 : 20), event.time, {
-      size: 16, weight: 'bold', anchor: 'start',
+    p.push(txt(x + 12, base + 2, event.time, {
+      size: event.time.length > 5 ? Math.min(15, fitSerif(event.time, 66, 15)) : 22, weight: 'bold', anchor: 'start',
     }));
-    const lines = wrapTitle(displayTitle(event.title), titleChars);
-    lines.forEach((title, j) => {
-      const titleX = narrow ? x + 17 : x + 73;
-      const titleY = narrow ? top + 34 + j * 15 : top + 18 + j * 17;
-      const titleW = narrow ? w - 32 : w - 87;
-      p.push(txt(titleX, titleY, title, {
-        size: fitSerif(title, titleW, narrow ? 13 : 15), anchor: 'start',
-        weight: j === 0 ? 'bold' : 'normal',
-      }));
+    lines.forEach((l, j) => {
+      p.push(txt(titleX, base + j * 20, l, { size: fitSerif(l, titleW, 18), anchor: 'start', weight: 'bold' }));
     });
-    if (i < events.length - 1) p.push(line(x + 14, top + rowH - 5, x + w - 14, top + rowH - 5, 0.8));
+    if (i < events.length - 1) p.push(line(x + 12, top + rowH, x + w - 12, top + rowH, 0.8));
     p.push('</g>');
   });
+  if (extra > 0) p.push(txt(x + w / 2, y + h - 7, `+${extra} etkinlik daha`, { size: 14, weight: 'bold', style: 'italic' }));
   return p.join('');
 }
 
-function landscapeDateBox(model, x, y, w, h, focus = false) {
-  const p = [rect(x, y, w, h, focus ? 3.5 : 2.5)];
-  const compact = h < 260;
-  if (compact) {
-    const day = String(model.effective.day).padStart(2, '0');
-    const leftW = Math.round(w * 0.5);
-    p.push(txt(x + leftW / 2 + 6, y + h - 26, day, {
-      family: DISPLAY, size: Math.min(Math.floor((h - 40) / 0.72), Math.floor((leftW - 10) / 0.86)),
-    }));
-    p.push(line(x + leftW + 6, y + 18, x + leftW + 6, y + h - 18, 1.5));
-    const rx = x + leftW + 6 + (w - leftW - 6) / 2;
-    const rw = w - leftW - 30;
-    p.push(txt(rx, y + 78, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, rw, 60), spacing: 1 }));
-    p.push(txt(rx, y + 146, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, rw, 52) }));
-    const hz = `${model.hizir.tur} ${model.hizir.gun}`;
-    p.push(txt(rx, y + 186, hz, { size: fitSerif(hz, rw, 20), weight: 'bold' }));
-    return p.join('');
-  }
-  const monthSize = fitSize(model.monthName, w - 30, compact ? 47 : focus ? 55 : 47);
-  p.push(txt(x + w / 2, y + (compact ? 42 : 49), model.monthName, {
-    family: DISPLAY, size: monthSize, spacing: 2,
-  }));
-  p.push(line(x + 16, y + (compact ? 53 : 61), x + w - 16, y + (compact ? 53 : 61), 1.5));
-
-  const day = String(model.effective.day).padStart(2, '0');
-  const daySize = compact
-    ? Math.min(128, Math.floor(w * 0.7))
-    : Math.min(focus ? 264 : 220, Math.floor(h * 0.7), Math.floor(w * 0.93));
-  p.push(txt(x + w / 2, y + (compact ? 151 : h * 0.73), day, { family: DISPLAY, size: daySize }));
-  p.push(txt(x + w / 2, y + h - 32, model.weekdayName, {
-    family: DISPLAY, size: fitSize(model.weekdayName, w - 30, compact ? 34 : focus ? 54 : 43), spacing: 1,
-  }));
-  p.push(txt(x + w / 2, y + h - 9, `${model.hizir.tur} ${model.hizir.gun}`, {
-    size: 15, weight: 'bold',
-  }));
-  return p.join('');
-}
-
-function landscapeWeatherBox(model, x, y, w, h) {
+function landscapeWeather(model, x, y, w, h) {
   const weather = model.weather;
   const p = [rect(x, y, w, h, 2.5)];
   const cx = x + w / 2;
   const label = WEATHER_LABEL.join(' · ');
-  p.push(txt(cx, y + 30, label, {
-    size: fitSerif(label, w - 18, 20), weight: 'bold', spacing: 0.5,
-  }));
-  p.push(line(x + 12, y + 46, x + w - 12, y + 46, 1.5));
-
-  // İkon + durum yan yana, altında dev gündüz sıcaklığı
-  p.push(weatherIcon(weather.ikon, x + 48, y + 84));
+  p.push(txt(cx, y + 26, label, { size: fitSerif(label, w - 20, 17), weight: 'bold', spacing: 0.4 }));
+  p.push(line(x + 12, y + 38, x + w - 12, y + 38, 1.5));
+  p.push(weatherIcon(weather.ikon, x + 42, y + 70));
   const dl = wrapDurum(weather.durum);
-  if (dl.length === 1) {
-    p.push(txt(x + 92, y + 92, dl[0], { size: fitSerif(dl[0], w - 104, 22), anchor: 'start', weight: 'bold' }));
-  } else {
-    dl.forEach((l, i) => p.push(txt(x + 92, y + 80 + i * 21, l, {
-      size: fitSerif(l, w - 104, 18), anchor: 'start', weight: 'bold',
-    })));
-  }
-
+  dl.forEach((l, i) => p.push(txt(x + 80, y + (dl.length === 1 ? 78 : 68 + i * 19), l, {
+    size: fitSerif(l, w - 90, dl.length === 1 ? 20 : 17), anchor: 'start', weight: 'bold',
+  })));
   const day = weather.gunduz == null ? '—' : `${weather.gunduz}°`;
   const night = weather.gece == null ? '—' : `${weather.gece}°`;
-  p.push(txt(cx, y + 186, day, { family: DISPLAY, size: fitSize(day, w - 30, 84) }));
-  const geceS = `Gece ${night}`;
-  p.push(txt(cx, y + 214, geceS, { size: 22, weight: 'bold' }));
-
+  p.push(txt(cx, y + 160, day, { family: DISPLAY, size: fitSize(day, w - 30, 70) }));
+  p.push(txt(cx, y + 185, `Gece ${night}`, { size: 19, weight: 'bold' }));
   const humidity = weather.nem == null ? '—' : `%${weather.nem}`;
   const wind = weather.ruzgar == null ? '—' : `${weather.ruzgar} km/s`;
   const extra = `Nem ${humidity} · ${wind}`;
-  p.push(txt(cx, y + 240, extra, { size: fitSerif(extra, w - 18, 17), weight: 'bold' }));
-  p.push(line(x + 18, y + 254, x + w - 18, y + 254, 1));
-
-  const names = model.names || {};
-  const nameTitle = 'Bugün doğanlara verilecek isimler';
-  const girl = `Kız: ${names.girl || '—'}`;
-  const boy = `Erkek: ${names.boy || '—'}`;
-  p.push(txt(cx, y + 273, nameTitle, {
-    size: fitSerif(nameTitle, w - 18, 14), weight: 'bold',
-  }));
-  p.push(txt(cx, y + 297, girl, {
-    size: fitSerif(girl, w - 20, 19), weight: 'bold',
-  }));
-  p.push(txt(cx, y + 321, boy, {
-    size: fitSerif(boy, w - 20, 19), weight: 'bold',
-  }));
+  p.push(txt(cx, y + h - 10, extra, { size: fitSerif(extra, w - 18, 15), weight: 'bold' }));
   return p.join('');
 }
 
-// Ajanda düzeninin hava şeridi: ikon | dev sıcaklık | durum + gece + nem/rüzgar
-function landscapeWeatherStrip(model, x, y, w, h) {
-  const weather = model.weather;
-  const p = [rect(x, y, w, h, 2.5)];
-  p.push(weatherIcon(weather.ikon, x + 44, y + h / 2 - 4));
-  const day = weather.gunduz == null ? '—' : `${weather.gunduz}°`;
-  const night = weather.gece == null ? '—' : `${weather.gece}°`;
-  const humidity = weather.nem == null ? '—' : `%${weather.nem}`;
-  const wind = weather.ruzgar == null ? '—' : `${weather.ruzgar} km/s`;
-  p.push(txt(x + 140, y + h - 18, day, { family: DISPLAY, size: fitSize(day, 110, 80) }));
-  p.push(line(x + 200, y + 12, x + 200, y + h - 12, 1.2));
-  const rx = x + 214;
-  const rw = w - 226;
-  p.push(txt(rx, y + 30, weather.durum, {
-    size: fitSerif(weather.durum, rw, 22), anchor: 'start', weight: 'bold',
-  }));
-  p.push(txt(rx, y + 58, `Gece ${night}`, {
-    size: fitSerif(`Gece ${night}`, rw, 21), anchor: 'start', weight: 'bold',
-  }));
-  p.push(txt(rx, y + 84, `${humidity} · ${wind}`, {
-    size: fitSerif(`${humidity} · ${wind}`, rw, 18), anchor: 'start', weight: 'bold',
-  }));
+function landscapeSolarStrip(model, x, y, w, h) {
+  const weather = model.weather || {};
+  const cells = [
+    ['Gün doğumu', weather.gunDogumu || '—'],
+    ['Gün batımı', weather.gunBatimi || '—'],
+    ['Gündüz', weather.gunduzSuresi || '—'],
+    ['İsim', [model.names?.girl, model.names?.boy].filter(Boolean).join(' · ') || '—'],
+  ];
+  const p = ['<g data-section="solar">', rect(x, y, w, h, 2)];
+  const cellW = w / cells.length;
+  cells.forEach(([label, value], i) => {
+    const cx = x + cellW * (i + 0.5);
+    if (i > 0) p.push(line(x + cellW * i, y + 7, x + cellW * i, y + h - 7, 1));
+    p.push(txt(cx, y + 17, label, { size: 13, weight: 'bold', spacing: 0.4 }));
+    p.push(txt(cx, y + h - 8, value, { size: fitSerif(value, cellW - 14, 20), weight: 'bold' }));
+  });
+  p.push('</g>');
+  return p.join('');
+}
+
+function landscapeHistory(model, x, y, w, h) {
+  const p = ['<g data-section="history">', rect(x, y, w, h, 2)];
+  p.push(txt(x + w / 2, y + 19, 'TARİHTE BUGÜN', { size: 14, weight: 'bold', spacing: 1 }));
+  p.push(line(x + 12, y + 27, x + w - 12, y + 27, 1));
+  const { event, special } = model.history || {};
+  let ty = y + 47;
+  if (special) {
+    p.push(txt(x + w / 2, ty, special, { size: fitSerif(special, w - 24, 17), weight: 'bold', style: 'italic' }));
+    ty += 22;
+  }
+  if (event) {
+    const lh = 19;
+    const maxLines = Math.max(1, Math.floor((y + h - 6 - ty) / lh) + 1);
+    const lines = wrapWords(`${event.year} — ${event.text}`, Math.floor((w - 24) / 7.9), maxLines);
+    lines.forEach((l, i) => p.push(txt(x + 14, ty + i * lh, l, {
+      size: fitSerif(l, w - 24, 15.5), anchor: 'start', weight: i === 0 ? 'bold' : 'normal',
+    })));
+  } else if (!special) {
+    p.push(txt(x + w / 2, y + h / 2 + 12, '—', { size: 18 }));
+  }
+  p.push('</g>');
+  return p.join('');
+}
+
+function landscapeMenu(model, x, y, w, h) {
+  const p = ['<g data-section="menu">', rect(x, y, w, h, 2)];
+  p.push(txt(x + w / 2, y + 21, 'GÜNÜN MENÜSÜ', { size: 15, weight: 'bold', spacing: 1 }));
+  p.push(line(x + 12, y + 30, x + w - 12, y + 30, 1));
+  const m = model.menu || {};
+  const items = [m.corba, m.ana, m.yaninda, m.tatli].filter(Boolean);
+  const step = (h - 40) / Math.max(items.length, 1);
+  items.forEach((item, i) => {
+    p.push(txt(x + w / 2, y + 30 + step * (i + 0.5) + 6, item, { size: fitSerif(item, w - 20, 17), weight: i === 1 ? 'bold' : 'normal' }));
+  });
+  p.push('</g>');
   return p.join('');
 }
 
 function landscapeQuote(model) {
   const quote = String(model.quote || '');
-  const p = [line(28, 493, 772, 493, 3)];
-  if (fitSerif(quote, 700, 28) >= 20) {
-    p.push(txt(400, 542, quote, {
-      size: fitSerif(quote, 700, 28), weight: 'bold', style: 'italic',
-    }));
+  const source = model.quoteSource ? `— ${model.quoteSource}` : '';
+  const p = ['<g data-section="quote">', line(26, 528, 774, 528, 3)];
+  const one = fitSerif(quote, 690, 23);
+  if (one >= 18) {
+    p.push(txt(400, 556, quote, { size: one, weight: 'bold', style: 'italic' }));
   } else {
-    const midpoint = Math.floor(quote.length / 2);
-    const split = quote.lastIndexOf(' ', midpoint);
-    const first = split > 0 ? quote.slice(0, split) : quote;
-    const second = split > 0 ? quote.slice(split + 1) : '';
-    const size = Math.min(21, fitSerif(first, 720, 21), fitSerif(second, 680, 21));
-    p.push(txt(400, 526, first, { size, weight: 'bold', style: 'italic' }));
-    if (second) p.push(txt(400, 552, second, { size, weight: 'bold', style: 'italic' }));
+    const [l1, l2 = ''] = wrapWords(quote, Math.ceil(quote.length / 2) + 6, 2);
+    const size = Math.min(19, fitSerif(l1, 700, 19), fitSerif(l2, 600, 19));
+    p.push(txt(400, 549, l1, { size, weight: 'bold', style: 'italic' }));
+    p.push(txt(400, 571, l2, { size, weight: 'bold', style: 'italic' }));
   }
-  p.push(txt(766, 574, FOOTER_TEXT, { size: 12, weight: 'bold', anchor: 'end' }));
-  return p.join('');
-}
-
-function landscapeSolarStrip(model) {
-  const weather = model.weather || {};
-  const cells = [
-    ['Gün doğumu', weather.gunDogumu || '—'],
-    ['Gün batımı', weather.gunBatimi || '—'],
-    ['Gündüz süresi', weather.gunduzSuresi || '—'],
-  ];
-  const x = 30, y = 500, w = 740, h = 60;
-  const cellW = w / cells.length;
-  const p = [`<g data-section="solar">`, rect(x, y, w, h, 2.5)];
-
-  cells.forEach(([label, value], i) => {
-    const cx = x + cellW * (i + 0.5);
-    if (i > 0) p.push(line(x + cellW * i, y + 8, x + cellW * i, y + h - 8, 1.2));
-    p.push(txt(cx, y + 21, label, { size: 15, weight: 'bold', spacing: 0.5 }));
-    p.push(txt(cx, y + 49, value, { size: 24, weight: 'bold' }));
-  });
-
+  if (source) p.push(txt(770, 579, source, { size: 13, weight: 'bold', anchor: 'end' }));
+  p.push(txt(30, 579, FOOTER_TEXT, { size: 11, weight: 'bold', anchor: 'start' }));
   p.push('</g>');
   return p.join('');
 }
@@ -588,26 +547,23 @@ export function buildLandscapeSVG(model, variant = 'balanced') {
 
   const s = [`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" data-layout="${variant}">`];
   s.push('<rect x="0" y="0" width="800" height="600" fill="#ffffff"/>');
-  s.push(txt(400, 25, HEADER_TEXT, { size: fitSerif(HEADER_TEXT, 700, 21), weight: 'bold', spacing: 2 }));
-  s.push(rect(12, 35, 776, 550, 3.5));
-  s.push(rect(18, 41, 764, 538, 1.2));
+  s.push(txt(400, 24, HEADER_TEXT, { size: fitSerif(HEADER_TEXT, 700, 19), weight: 'bold', spacing: 2 }));
+  s.push(rect(12, 33, 776, 555, 3.5));
+  s.push(rect(18, 39, 764, 543, 1.2));
   s.push(landscapeHeader(model));
 
-  if (variant === 'balanced') {
-    s.push(landscapeCalendarBox(model, 30, 145, 225, 330));
-    s.push(landscapeDateBox(model, 270, 145, 260, 330));
-    s.push(landscapeWeatherBox(model, 545, 145, 225, 330));
-  } else if (variant === 'date-focus') {
-    s.push(landscapeDateBox(model, 30, 145, 500, 330, true));
-    s.push(landscapeWeatherBox(model, 545, 145, 225, 330));
+  const top = 120, mainH = 214;
+  if (variant === 'date-focus') {
+    s.push(landscapeDateWide(model, 30, top, 524, mainH));
   } else {
-    s.push(landscapeCalendarBox(model, 30, 145, 350, 330, 5));
-    s.push(landscapeDateBox(model, 395, 145, 375, 215, true));
-    s.push(landscapeWeatherStrip(model, 395, 375, 375, 100));
+    s.push(landscapeDateColumn(model, 30, top, 248, mainH));
+    s.push(landscapeAgenda(model, 288, top, 266, mainH));
   }
-
-  if (variant === 'date-focus') s.push(landscapeSolarStrip(model));
-  else s.push(landscapeQuote(model));
+  s.push(landscapeWeather(model, 564, top, 206, mainH));
+  s.push(landscapeSolarStrip(model, 30, 342, 740, 46));
+  s.push(landscapeHistory(model, 30, 396, 474, 126));
+  s.push(landscapeMenu(model, 514, 396, 256, 126));
+  s.push(landscapeQuote(model));
   s.push('</svg>');
   return s.join('\n');
 }

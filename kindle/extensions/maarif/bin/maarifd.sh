@@ -90,7 +90,7 @@ schedule_next() {
   esac
   state_set fails "$FAILS"
   state_set next_due "$NEXT"
-  arm_rtc "$((NEXT - NOW))" || true
+  arm_rtc "$((NEXT - NOW))" quiet || true
   log_message "sonraki yenileme $((NEXT - NOW))s sonra ($("$DATE_BIN" -d "@$NEXT" '+%H:%M' 2>/dev/null || printf '%s' "$NEXT"))"
 }
 

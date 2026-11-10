@@ -87,7 +87,9 @@ arm_rtc() {
   if "$LIPC_SET_BIN" -i com.lab126.powerd rtcWakeup "$ARM_SECONDS" >/dev/null 2>&1; then
     return 0
   fi
-  log_message "UYARI: rtcWakeup ${ARM_SECONDS}s ayarlanamadı"
+  # Uyanıkken (Active) powerd alarmı reddeder; asıl alarmı uyku dinleyicisi
+  # readyToSuspend anında kurar. Yalnız uykuya geçerken başarısızlık önemli.
+  [ "${2:-}" = quiet ] || log_message "UYARI: rtcWakeup ${ARM_SECONDS}s ayarlanamadı"
   return 1
 }
 
