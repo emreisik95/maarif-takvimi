@@ -368,202 +368,152 @@ function wrapWords(text, maxChars, maxLines) {
   return lines;
 }
 
-function landscapeHeader(model) {
+// Bir sonraki (veya süren) etkinlik: önce saatli olanlar, yoksa tüm gün.
+function nextEvent(events) {
+  const timed = events.filter((e) => /^\d{1,2}:\d{2}$/.test(e.time));
+  return timed[0] ?? events[0] ?? null;
+}
+
+// Alt kutu her 3 saatlik yenilemede sırayla değişir (günde her biri ~2 kez).
+export const ROTATING_PANELS = Object.freeze(['history', 'menu', 'sun', 'calendar']);
+export function rotatingPanelFor(model) {
+  return ROTATING_PANELS[Math.floor((model.now?.hour ?? 0) / 3) % ROTATING_PANELS.length];
+}
+
+function scaledIcon(type, cx, cy, k) {
+  return `<g transform="translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})">${weatherIcon(type, cx, cy)}</g>`;
+}
+
+// Sol sütun: AY / dev gün / GÜN ADI
+function bigDate(model) {
   const p = [];
-  const miladi = `Miladi ${model.effective.year} · Ay ${model.effective.month} · Gün ${model.dayOfYear}`;
-  const rumi = model.rumi ? `Rumi ${model.rumi.gun} ${model.rumi.ayAdi} ${model.rumi.yil}` : '';
-  const hicri = `Hicri ${model.hicri.gun} ${model.hicri.ayAdi} ${model.hicri.yil}`;
-  const hizir = `${model.hizir.tur} ${model.hizir.gun}`;
-  p.push(txt(165, 66, miladi, { size: fitSerif(miladi, 280, 19), weight: 'bold' }));
-  if (rumi) p.push(txt(165, 92, rumi, { size: fitSerif(rumi, 280, 17), weight: 'bold' }));
-  p.push(clock(400, 75, 34, model.now.hour, model.now.minute));
-  p.push(txt(635, 66, hicri, { size: fitSerif(hicri, 280, 19), weight: 'bold' }));
-  p.push(txt(635, 92, hizir, { size: 17, weight: 'bold' }));
-  p.push(line(26, 112, 774, 112, 3));
-  return p.join('');
-}
-
-// Dikey tarih kutusu (ajandalı düzen): ay / dev gün / gün adı.
-function landscapeDateColumn(model, x, y, w, h) {
-  const p = [rect(x, y, w, h, 3)];
-  const cx = x + w / 2;
-  p.push(txt(cx, y + 40, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, w - 30, 42), spacing: 2 }));
-  p.push(line(x + 14, y + 52, x + w - 14, y + 52, 1.5));
+  const cx = 162;
+  p.push(txt(cx, 76, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, 270, 60), spacing: 3 }));
   const day = String(model.effective.day).padStart(2, '0');
-  p.push(txt(cx, y + h - 40, day, { family: DISPLAY, size: Math.min(150, Math.floor((h - 100) / 0.72)) }));
-  p.push(txt(cx, y + h - 9, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, w - 30, 34), spacing: 1 }));
+  p.push(txt(cx, 300, day, { family: DISPLAY, size: 262 }));
+  p.push(txt(cx, 362, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, 270, 56), spacing: 1 }));
   return p.join('');
 }
 
-// Yatay tarih kutusu (ajandasız düzen): dev gün solda, ay + gün adı sağda.
-function landscapeDateWide(model, x, y, w, h) {
-  const p = [rect(x, y, w, h, 3)];
-  const day = String(model.effective.day).padStart(2, '0');
-  const leftW = Math.round(w * 0.46);
-  p.push(txt(x + leftW / 2 + 4, y + h - 22, day, {
-    family: DISPLAY, size: Math.min(Math.floor((h - 36) / 0.72), Math.floor((leftW - 10) / 0.86)),
-  }));
-  p.push(line(x + leftW + 6, y + 16, x + leftW + 6, y + h - 16, 1.5));
-  const rx = x + leftW + 6 + (w - leftW - 6) / 2;
-  const rw = w - leftW - 34;
-  p.push(txt(rx, y + 84, model.monthName, { family: DISPLAY, size: fitSize(model.monthName, rw, 72), spacing: 2 }));
-  p.push(txt(rx, y + 160, model.weekdayName, { family: DISPLAY, size: fitSize(model.weekdayName, rw, 58), spacing: 1 }));
+function bigWeather(model) {
+  const w = model.weather || {};
+  const p = [scaledIcon(w.ikon, 362, 84, 1.7)];
+  const day = w.gunduz == null ? '—' : `${w.gunduz}°`;
+  p.push(txt(500, 142, day, { family: DISPLAY, size: fitSize(day, 160, 124) }));
+  const durum = String(w.durum ?? '—');
+  p.push(txt(590, 90, durum, { size: fitSerif(durum, 186, 28), weight: 'bold', anchor: 'start' }));
+  const gece = `Gece ${w.gece == null ? '—' : `${w.gece}°`}`;
+  p.push(txt(590, 132, gece, { size: 28, weight: 'bold', anchor: 'start' }));
   return p.join('');
 }
 
-function landscapeAgenda(model, x, y, w, h) {
-  const p = [rect(x, y, w, h, 2.5)];
-  const label = model.rolled ? 'YARININ AJANDASI' : 'BUGÜNÜN AJANDASI';
-  p.push(txt(x + w / 2, y + 26, label, { size: fitSerif(label, w - 30, 18), weight: 'bold', spacing: 0.4 }));
-  p.push(line(x + 12, y + 38, x + w - 12, y + 38, 1.5));
-
-  const all = model.events || [];
-  const events = all.slice(0, 3);
-  const extra = all.length - events.length;
-  const rowH = (h - 44 - (extra > 0 ? 18 : 0)) / Math.max(events.length, 1);
-  const titleX = x + 84;
-  const titleW = w - 94;
-  events.forEach((event, i) => {
-    const top = y + 42 + i * rowH;
-    const lines = wrapWords(displayTitle(event.title), Math.floor(titleW / 9.6), rowH >= 52 ? 2 : 1);
-    const blockH = 18 + (lines.length - 1) * 20;
-    const base = top + (rowH - blockH) / 2 + 15;
-    p.push(`<g aria-label="${esc(`${event.time} ${event.title}`)}">`);
-    p.push(txt(x + 12, base + 2, event.time, {
-      size: event.time.length > 5 ? Math.min(15, fitSerif(event.time, 66, 15)) : 22, weight: 'bold', anchor: 'start',
-    }));
-    lines.forEach((l, j) => {
-      p.push(txt(titleX, base + j * 20, l, { size: fitSerif(l, titleW, 18), anchor: 'start', weight: 'bold' }));
-    });
-    if (i < events.length - 1) p.push(line(x + 12, top + rowH, x + w - 12, top + rowH, 0.8));
-    p.push('</g>');
-  });
-  if (extra > 0) p.push(txt(x + w / 2, y + h - 7, `+${extra} etkinlik daha`, { size: 14, weight: 'bold', style: 'italic' }));
-  return p.join('');
-}
-
-function landscapeWeather(model, x, y, w, h) {
-  const weather = model.weather;
-  const p = [rect(x, y, w, h, 2.5)];
-  const cx = x + w / 2;
-  const label = WEATHER_LABEL.join(' · ');
-  p.push(txt(cx, y + 26, label, { size: fitSerif(label, w - 20, 17), weight: 'bold', spacing: 0.4 }));
-  p.push(line(x + 12, y + 38, x + w - 12, y + 38, 1.5));
-  p.push(weatherIcon(weather.ikon, x + 42, y + 70));
-  const dl = wrapDurum(weather.durum);
-  dl.forEach((l, i) => p.push(txt(x + 80, y + (dl.length === 1 ? 78 : 68 + i * 19), l, {
-    size: fitSerif(l, w - 90, dl.length === 1 ? 20 : 17), anchor: 'start', weight: 'bold',
-  })));
-  const day = weather.gunduz == null ? '—' : `${weather.gunduz}°`;
-  const night = weather.gece == null ? '—' : `${weather.gece}°`;
-  p.push(txt(cx, y + 160, day, { family: DISPLAY, size: fitSize(day, w - 30, 70) }));
-  p.push(txt(cx, y + 185, `Gece ${night}`, { size: 19, weight: 'bold' }));
-  const humidity = weather.nem == null ? '—' : `%${weather.nem}`;
-  const wind = weather.ruzgar == null ? '—' : `${weather.ruzgar} km/s`;
-  const extra = `Nem ${humidity} · ${wind}`;
-  p.push(txt(cx, y + h - 10, extra, { size: fitSerif(extra, w - 18, 15), weight: 'bold' }));
-  return p.join('');
-}
-
-function landscapeSolarStrip(model, x, y, w, h) {
-  const weather = model.weather || {};
-  const cells = [
-    ['Gün doğumu', weather.gunDogumu || '—'],
-    ['Gün batımı', weather.gunBatimi || '—'],
-    ['Gündüz', weather.gunduzSuresi || '—'],
-    ['İsim', [model.names?.girl, model.names?.boy].filter(Boolean).join(' · ') || '—'],
-  ];
-  const p = ['<g data-section="solar">', rect(x, y, w, h, 2)];
-  const cellW = w / cells.length;
-  cells.forEach(([label, value], i) => {
-    const cx = x + cellW * (i + 0.5);
-    if (i > 0) p.push(line(x + cellW * i, y + 7, x + cellW * i, y + h - 7, 1));
-    p.push(txt(cx, y + 17, label, { size: 13, weight: 'bold', spacing: 0.4 }));
-    p.push(txt(cx, y + h - 8, value, { size: fitSerif(value, cellW - 14, 20), weight: 'bold' }));
-  });
-  p.push('</g>');
-  return p.join('');
-}
-
-function landscapeHistory(model, x, y, w, h) {
-  const p = ['<g data-section="history">', rect(x, y, w, h, 2)];
-  p.push(txt(x + w / 2, y + 19, 'TARİHTE BUGÜN', { size: 14, weight: 'bold', spacing: 1 }));
-  p.push(line(x + 12, y + 27, x + w - 12, y + 27, 1));
-  const { event, special } = model.history || {};
-  let ty = y + 47;
-  if (special) {
-    p.push(txt(x + w / 2, ty, special, { size: fitSerif(special, w - 24, 17), weight: 'bold', style: 'italic' }));
-    ty += 22;
+function bigAgenda(model) {
+  const p = [];
+  const x = 332, w = 436;
+  const events = model.events || [];
+  const ev = nextEvent(events);
+  if (!ev) {
+    // Ajanda boşsa: takvim bilgileri büyük.
+    const lines = [
+      `Hicri ${model.hicri.gun} ${model.hicri.ayAdi}`,
+      model.rumi ? `Rumi ${model.rumi.gun} ${model.rumi.ayAdi}` : '',
+      `${model.hizir.tur} ${model.hizir.gun} · Gün ${model.dayOfYear}`,
+    ].filter(Boolean);
+    lines.forEach((l, i) => p.push(txt(x + w / 2, 232 + i * 46, l, { size: fitSerif(l, w, 32), weight: 'bold' })));
+    return p.join('');
   }
-  if (event) {
-    const lh = 19;
-    const maxLines = Math.max(1, Math.floor((y + h - 6 - ty) / lh) + 1);
-    const lines = wrapWords(`${event.year} — ${event.text}`, Math.floor((w - 24) / 7.9), maxLines);
-    lines.forEach((l, i) => p.push(txt(x + 14, ty + i * lh, l, {
-      size: fitSerif(l, w - 24, 15.5), anchor: 'start', weight: i === 0 ? 'bold' : 'normal',
-    })));
-  } else if (!special) {
-    p.push(txt(x + w / 2, y + h / 2 + 12, '—', { size: 18 }));
-  }
-  p.push('</g>');
-  return p.join('');
-}
-
-function landscapeMenu(model, x, y, w, h) {
-  const p = ['<g data-section="menu">', rect(x, y, w, h, 2)];
-  p.push(txt(x + w / 2, y + 21, 'GÜNÜN MENÜSÜ', { size: 15, weight: 'bold', spacing: 1 }));
-  p.push(line(x + 12, y + 30, x + w - 12, y + 30, 1));
-  const m = model.menu || {};
-  const items = [m.corba, m.ana, m.yaninda, m.tatli].filter(Boolean);
-  const step = (h - 40) / Math.max(items.length, 1);
-  items.forEach((item, i) => {
-    p.push(txt(x + w / 2, y + 30 + step * (i + 0.5) + 6, item, { size: fitSerif(item, w - 20, 17), weight: i === 1 ? 'bold' : 'normal' }));
+  const label = model.rolled ? 'YARIN' : 'SIRADAKİ';
+  p.push(txt(x, 196, label, { size: 18, weight: 'bold', spacing: 2, anchor: 'start' }));
+  const time = ev.time;
+  p.push(txt(x, 244, time, { size: time.length > 5 ? 34 : 44, weight: 'bold', anchor: 'start' }));
+  wrapWords(displayTitle(ev.title), Math.floor(w / 15.5), 2).forEach((l, i) => {
+    p.push(txt(x, 286 + i * 36, l, { size: fitSerif(l, w, 30), weight: 'bold', anchor: 'start' }));
   });
-  p.push('</g>');
+  const others = events.filter((e) => e !== ev);
+  if (others.length) {
+    const after = others.find((e) => e.time > time && /^\d/.test(e.time)) ?? others[0];
+    const more = `sonra ${after.time} ${displayTitle(after.title)}`;
+    const tail = others.length > 1 ? `  (+${others.length - 1})` : '';
+    p.push(txt(x, 360, clip(more, 34) + tail, { size: fitSerif(clip(more, 34) + tail, w, 22), weight: 'bold', style: 'italic', anchor: 'start' }));
+  }
   return p.join('');
 }
 
-function landscapeQuote(model) {
-  const quote = String(model.quote || '');
-  const source = model.quoteSource ? `— ${model.quoteSource}` : '';
-  const p = ['<g data-section="quote">', line(26, 528, 774, 528, 3)];
-  const one = fitSerif(quote, 690, 23);
-  if (one >= 18) {
-    p.push(txt(400, 556, quote, { size: one, weight: 'bold', style: 'italic' }));
+function rotatingBox(model, y, h) {
+  const p = [];
+  let panel = rotatingPanelFor(model);
+  // Ajanda boşken takvim bilgileri zaten sağda büyük yazılı; tekrar etme.
+  if (panel === 'calendar' && !(model.events || []).length) panel = 'sun';
+  let title = '';
+  let lines = [];
+  if (panel === 'history' && (model.history?.event || model.history?.special)) {
+    const { event, special } = model.history;
+    title = 'TARİHTE BUGÜN';
+    if (special) lines.push({ t: special, italic: true });
+    if (event) {
+      const ev = wrapWords(`${event.year} — ${event.text}`, 52, special ? 1 : 2);
+      ev.forEach((t) => lines.push({ t }));
+    }
+  } else if (panel === 'menu' && model.menu) {
+    const m = model.menu;
+    title = 'GÜNÜN MENÜSÜ';
+    lines = [{ t: `${m.corba} · ${m.ana}` }, { t: `${m.yaninda} · ${m.tatli}` }];
+  } else if (panel === 'sun' || panel === 'history' || panel === 'menu') {
+    const w = model.weather || {};
+    title = 'GÜNEŞ VE İSİMLER';
+    lines = [
+      { t: `Doğuş ${w.gunDogumu || '—'}   Batış ${w.gunBatimi || '—'}   Gündüz ${w.gunduzSuresi || '—'}` },
+      { t: `Bugünün isimleri: ${[model.names?.girl, model.names?.boy].filter(Boolean).join(' · ') || '—'}` },
+    ];
   } else {
-    const [l1, l2 = ''] = wrapWords(quote, Math.ceil(quote.length / 2) + 6, 2);
-    const size = Math.min(19, fitSerif(l1, 700, 19), fitSerif(l2, 600, 19));
-    p.push(txt(400, 549, l1, { size, weight: 'bold', style: 'italic' }));
-    p.push(txt(400, 571, l2, { size, weight: 'bold', style: 'italic' }));
+    title = 'TAKVİM';
+    lines = [
+      { t: `Hicri ${model.hicri.gun} ${model.hicri.ayAdi} ${model.hicri.yil}` },
+      { t: `${model.rumi ? `Rumi ${model.rumi.gun} ${model.rumi.ayAdi} ${model.rumi.yil} · ` : ''}${model.hizir.tur} ${model.hizir.gun}` },
+    ];
   }
-  if (source) p.push(txt(770, 579, source, { size: 13, weight: 'bold', anchor: 'end' }));
-  p.push(txt(30, 579, FOOTER_TEXT, { size: 11, weight: 'bold', anchor: 'start' }));
+  p.push(`<g data-section="${panel}">`);
+  p.push(txt(400, y + 22, title, { size: 18, weight: 'bold', spacing: 3 }));
+  lines.slice(0, 2).forEach((l, i) => {
+    p.push(txt(400, y + 60 + i * 36, l.t, {
+      size: fitSerif(l.t, 740, 28), weight: 'bold', style: l.italic ? 'italic' : 'normal',
+    }));
+  });
+  p.push('</g>');
+  return p.join('');
+}
+
+function bigQuote(model, y) {
+  const p = ['<g data-section="quote">'];
+  const quote = String(model.quote || '');
+  const one = fitSerif(quote, 740, 34);
+  if (one >= 26) {
+    p.push(txt(400, y + 44, quote, { size: one, weight: 'bold', style: 'italic' }));
+  } else {
+    const [l1, l2 = ''] = wrapWords(quote, Math.ceil(quote.length / 2) + 8, 2);
+    const size = Math.min(28, fitSerif(l1, 750, 28), fitSerif(l2, 750, 28));
+    p.push(txt(400, y + 32, l1, { size, weight: 'bold', style: 'italic' }));
+    p.push(txt(400, y + 66, l2, { size, weight: 'bold', style: 'italic' }));
+  }
+  if (model.quoteSource) p.push(txt(774, y + 88, `— ${model.quoteSource}`, { size: 16, weight: 'bold', anchor: 'end' }));
   p.push('</g>');
   return p.join('');
 }
 
 export function buildLandscapeSVG(model, variant = 'balanced') {
   if (!LANDSCAPE_VARIANTS.includes(variant)) throw new Error(`Unknown landscape layout: ${variant}`);
-
   const s = [`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" data-layout="${variant}">`];
   s.push('<rect x="0" y="0" width="800" height="600" fill="#ffffff"/>');
-  s.push(txt(400, 24, HEADER_TEXT, { size: fitSerif(HEADER_TEXT, 700, 19), weight: 'bold', spacing: 2 }));
-  s.push(rect(12, 33, 776, 555, 3.5));
-  s.push(rect(18, 39, 764, 543, 1.2));
-  s.push(landscapeHeader(model));
-
-  const top = 120, mainH = 214;
-  if (variant === 'date-focus') {
-    s.push(landscapeDateWide(model, 30, top, 524, mainH));
-  } else {
-    s.push(landscapeDateColumn(model, 30, top, 248, mainH));
-    s.push(landscapeAgenda(model, 288, top, 266, mainH));
-  }
-  s.push(landscapeWeather(model, 564, top, 206, mainH));
-  s.push(landscapeSolarStrip(model, 30, 342, 740, 46));
-  s.push(landscapeHistory(model, 30, 396, 474, 126));
-  s.push(landscapeMenu(model, 514, 396, 256, 126));
-  s.push(landscapeQuote(model));
+  s.push(rect(8, 8, 784, 584, 4));
+  s.push(bigDate(model));
+  s.push(line(314, 24, 314, 368, 2));
+  s.push(bigWeather(model));
+  s.push(line(326, 162, 776, 162, 2));
+  s.push(bigAgenda(model));
+  s.push(line(24, 378, 776, 378, 3));
+  s.push(rotatingBox(model, 380, 110));
+  s.push(line(24, 494, 776, 494, 3));
+  s.push(bigQuote(model, 496));
   s.push('</svg>');
   return s.join('\n');
 }

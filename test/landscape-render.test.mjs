@@ -35,24 +35,39 @@ const model = {
   rolled: false,
 };
 
-test('yatay maarif yaprağı tüm bölümleri tek sayfada gösterir', () => {
-  for (const variant of render.LANDSCAPE_VARIANTS) {
-    const svg = render.buildLandscapeSVG(model, variant);
-    assert.match(svg, /<svg[^>]*width="800"[^>]*height="600"/);
-    for (const text of ['KASIM', '>10<', 'SALI', 'Rumi 28 Teşrinievvel 1442', 'Hicri 30 Cemaziyelevvel 1448',
-      'TARİHTE BUGÜN', "Atatürk'ü Anma Günü", 'GÜNÜN MENÜSÜ', 'Kuru fasulye', 'Defne · Kerem',
-      'Gün doğumu', '07:40', 'Dost başa, düşman ayağa bakar.', '— Atasözü', 'Açık']) {
-      assert.ok(svg.includes(text.replace(/'/g, '&#39;')) || svg.includes(text), `${variant}: ${text}`);
-    }
-    if (variant === 'date-focus') assert.doesNotMatch(svg, /AJANDASI/);
-    else assert.match(svg, /Proje değerlendirme/);
-    assert.match(svg, new RegExp(`data-layout="${variant}"`));
+test('uzaktan okunur yaprak: dev tarih, hava, sıradaki etkinlik ve söz', () => {
+  const svg = render.buildLandscapeSVG(model, 'agenda-focus');
+  assert.match(svg, /<svg[^>]*width="800"[^>]*height="600"/);
+  for (const text of ['KASIM', '>10<', 'SALI', '18°', 'Açık', 'Gece 9°', 'SIRADAKİ', '09:00',
+    'Proje değerlendirme', 'sonra 12:30 Öğle yemeği', 'Dost başa, düşman ayağa bakar.', '— Atasözü']) {
+    assert.ok(svg.includes(text), text);
   }
+  // Uzaktan okunurluk: söz ve etkinlik başlığı en az 26px.
+  assert.match(svg, /font-size="(2[6-9]|3\d)"[^>]*>Proje değerlendirme/);
 });
 
-test('veri yoksa bölümler boş kalır ama sayfa çizilir', () => {
-  const svg = render.buildLandscapeSVG({ ...model, history: { event: null, special: null }, menu: null, quoteSource: '' }, 'date-focus');
-  assert.match(svg, /TARİHTE BUGÜN/);
+test('alt kutu yenilemelere göre sırayla değişir', () => {
+  const at = (hour) => render.buildLandscapeSVG({ ...model, now: { hour, minute: 0 } }, 'agenda-focus');
+  assert.match(at(1), /TARİHTE BUGÜN/);
+  assert.ok(at(1).includes("Atatürk") );
+  assert.match(at(4), /GÜNÜN MENÜSÜ/);
+  assert.match(at(4), /Tarhana çorbası · Kuru fasulye/);
+  assert.match(at(7), /GÜNEŞ VE İSİMLER/);
+  assert.match(at(7), /Defne · Kerem/);
+  assert.match(at(10), /TAKVİM/);
+  assert.match(at(10), /Rumi 28 Teşrinievvel 1442/);
+});
+
+test('ajanda boşsa takvim bilgileri büyük gösterilir ve alt kutuda tekrar edilmez', () => {
+  const svg = render.buildLandscapeSVG({ ...model, events: [], now: { hour: 10, minute: 0 } }, 'date-focus');
+  assert.match(svg, /Hicri 30 Cemaziyelevvel/);
+  assert.doesNotMatch(svg, />TAKVİM</);
+  assert.match(svg, /GÜNEŞ VE İSİMLER/);
+});
+
+test('veri yoksa alt kutu güneş/isim paneline düşer', () => {
+  const svg = render.buildLandscapeSVG({ ...model, history: { event: null, special: null }, now: { hour: 1, minute: 0 }, quoteSource: '' }, 'date-focus');
+  assert.match(svg, /GÜNEŞ VE İSİMLER/);
   assert.doesNotMatch(svg, /— Atasözü/);
 });
 
